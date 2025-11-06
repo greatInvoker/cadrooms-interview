@@ -1,4 +1,4 @@
-# Take-Home Project:
+# Take-Home Project
 
 ## Goal
 
