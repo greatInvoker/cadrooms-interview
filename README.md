@@ -50,3 +50,4 @@ Submit a pull request link to your repository. The PR should contain:
 - Keep the instructions lean; the focus is your application design and implementation.
 - Any model format supported by your `assembly_creator` integration is acceptable.
 - `assembly_creator` Github repo link <https://github.com/techsoft3d/assembly_creator>
+- Hoops Web Viewer Documentation <https://docs.techsoft3d.com/hoops/visualize-web/>
