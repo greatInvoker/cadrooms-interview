@@ -32,8 +32,7 @@ Use Supabase locally for persistence. You decide the table/storage structure, as
 - Supabase (local) only for storing and managing Scenes (name + description + timestamps).
 - Viewer: integrate the `assembly_creator` code directly as a React component and use the sample `.scs` files already included in the HOOPS example.
 - Delete a scene should remove it from your Supabase data.
-
-No file uploads. No storage bucket configuration. Just use the example `.scs` files for viewing.
+- Use the Supabase storage to serve the files
 
 ---
 
