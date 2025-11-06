@@ -13,7 +13,7 @@ Keep it simple. Make pragmatic choices. The bonus is how you design and structur
 A minimal app with three flows:
 
 1. **Scenes List** – show all of your scenes (sorted by `updatedAt`) with create/edit/delete.
-2. **Scene Editor** – form (name, description) + file upload(s) saved to Supabase Storage.
+2. **Scene Editor** – allow user to drag parts in the scene and place the model
 3. **Scene Viewer** – renders at least one uploaded model via a component you build by integrating Tech Soft 3D's `assembly_creator` code directly (no iframe), loading files from Supabase Storage URLs.
 
 All viewer files must be stored in local Supabase Storage.
