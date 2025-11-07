@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
+supabase/logs/
+supabase/functions/node_modules/
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
