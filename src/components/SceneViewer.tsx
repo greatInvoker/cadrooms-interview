@@ -1,0 +1,250 @@
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "../lib/supabase";
+import type { Scene } from "../types";
+import { PartsList } from "./PartsList";
+import "../types/hoops.d.ts";
+
+interface SceneViewerProps {
+  sceneId: string;
+  onClose?: () => void;
+}
+
+interface Part {
+  id: string;
+  name: string;
+  fileName: string;
+  thumbnail?: string;
+}
+
+export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<Communicator.WebViewer | null>(null);
+  const [scene, setScene] = useState<Scene | null>(null);
+  const [parts, setParts] = useState<Part[]>([]);
+  const [status, setStatus] = useState<string>("Initializing...");
+
+  useEffect(() => {
+    async function init() {
+      try {
+        setStatus("Loading scene data...");
+
+        const { data, error: fetchError } = await supabase
+          .from("scenes")
+          .select("*")
+          .eq("id", sceneId)
+          .single();
+
+        if (fetchError) throw fetchError;
+        if (!data) throw new Error("Scene not found");
+
+        setScene(data);
+
+        const response = await fetch("/parts/parts_list.json");
+        const partsData = await response.json();
+
+        const loadedParts: Part[] = partsData.parts.map((part: { id: number; name: string }) => ({
+          id: part.id.toString(),
+          name: part.name.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()),
+          fileName: `${part.name}.scs`,
+          thumbnail: `/parts/${part.name}.png`,
+        }));
+
+        setParts(loadedParts);
+
+        setStatus("Initializing 3D viewer...");
+        await initViewer();
+
+      } catch (err) {
+        console.error("Initialization error:", err);
+        setStatus(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+      }
+    }
+
+    init();
+
+    return () => {
+      if (viewerRef.current) {
+        viewerRef.current.shutdown().catch(console.error);
+      }
+    };
+  }, [sceneId]);
+
+  async function initViewer() {
+    return new Promise<void>((resolve, reject) => {
+      if (!containerRef.current) {
+        reject(new Error("Container not ready"));
+        return;
+      }
+
+      if (typeof window.Communicator === "undefined") {
+        reject(new Error("HOOPS Communicator not loaded"));
+        return;
+      }
+
+      const containerId = `viewer-${sceneId}`;
+      containerRef.current.id = containerId;
+
+      console.log("Creating viewer with container:", containerId);
+
+      const viewer = new window.Communicator.WebViewer({
+        containerId: containerId,
+        endpointUri: "/parts/housing.scs",
+      });
+
+      viewerRef.current = viewer;
+
+      viewer.setCallbacks({
+        sceneReady: () => {
+          console.log("Scene ready!");
+          setStatus("Ready! Drag parts from the right panel");
+
+          const view = viewer.getView();
+          view.setBackgroundColor(
+            new window.Communicator.Color(240, 240, 245),
+            new window.Communicator.Color(200, 200, 210)
+          );
+
+          const axisTriad = view.getAxisTriad();
+          axisTriad.enable();
+          axisTriad.setAnchor(window.Communicator.OverlayAnchor.LowerLeftCorner);
+
+          resolve();
+        },
+        modelStructureReady: () => {
+          console.log("Model structure ready");
+          const view = viewer.getView();
+          view.fitWorld();
+        },
+      });
+
+      viewer.start().catch((err) => {
+        console.error("Viewer start failed:", err);
+        setStatus(`Failed to start viewer: ${err.message}`);
+        reject(err);
+      });
+    });
+  }
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!viewerRef.current) return;
+
+    try {
+      const partData = e.dataTransfer.getData("application/json");
+      if (!partData) return;
+
+      const part: Part = JSON.parse(partData);
+      const viewer = viewerRef.current;
+      const model = viewer.getModel();
+      const rootNodeId = model.getRootNode();
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      console.log(`Loading part: ${part.fileName}`);
+
+      const nodeId = await viewer.loadSubtreeFromScsFile(
+        rootNodeId,
+        `/parts/${part.fileName}`
+      );
+
+      const matrix = new window.Communicator.Matrix();
+      const offsetX = (x - rect.width / 2) / 50;
+      const offsetY = (rect.height / 2 - y) / 50;
+      matrix.setTranslationComponent(offsetX, offsetY, 0);
+
+      model.setNodeMatrix(nodeId, matrix);
+
+      setTimeout(() => {
+        viewer.getView().fitWorld();
+      }, 100);
+
+    } catch (err) {
+      console.error("Drop failed:", err);
+      alert(`Failed to load part: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  return (
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+      <div
+        style={{
+          padding: "15px 20px",
+          borderBottom: "1px solid #ddd",
+          backgroundColor: "#f8f9fa",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, fontSize: "20px" }}>{scene?.name || "Scene Viewer"}</h2>
+          {scene?.description && (
+            <p style={{ margin: "5px 0 0 0", color: "#666", fontSize: "14px" }}>
+              {scene.description}
+            </p>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <span style={{ fontSize: "12px", color: status.includes("Ready") ? "#28a745" : "#ff9800" }}>
+            {status}
+          </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{
+                padding: "8px 16px",
+                backgroundColor: "#6c757d",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+              }}
+            >
+              Close
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div
+          ref={containerRef}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          style={{
+            flex: 1,
+            position: "relative",
+            backgroundColor: "#f0f0f5",
+          }}
+        />
+
+        <div style={{ width: "300px", flexShrink: 0 }}>
+          <PartsList parts={parts} />
+        </div>
+      </div>
+
+      <div
+        style={{
+          padding: "10px 20px",
+          borderTop: "1px solid #ddd",
+          backgroundColor: "#f8f9fa",
+          fontSize: "12px",
+          color: "#666",
+        }}
+      >
+        {parts.length} parts available
+      </div>
+    </div>
+  );
+}
