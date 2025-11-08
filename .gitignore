@@ -33,3 +33,6 @@ supabase/functions/node_modules/
 .env.keys
 .env.local
 .env.*.local
+
+# Claude AI
+.claude/
