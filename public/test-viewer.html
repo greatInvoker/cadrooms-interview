@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOOPS Viewer Test</title>
+    <script src="https://cdn.jsdelivr.net/gh/techsoft3d/hoops-web-viewer@2024.0.0/hoops_web_viewer.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #status {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        #viewer-container {
+            width: 800px;
+            height: 600px;
+            border: 2px solid #333;
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <h1>HOOPS Web Viewer Test</h1>
+    <div id="status">Initializing...</div>
+    <div id="viewer-container"></div>
+
+    <script>
+        function updateStatus(msg) {
+            document.getElementById('status').innerHTML = msg;
+            console.log(msg);
+        }
+
+        window.addEventListener('load', function() {
+            updateStatus('Page loaded. Checking for Communicator...');
+
+            if (typeof Communicator === 'undefined') {
+                updateStatus('❌ ERROR: HOOPS Communicator not loaded!');
+                return;
+            }
+
+            updateStatus('✅ Communicator found. Creating viewer...');
+
+            try {
+                const viewer = new Communicator.WebViewer({
+                    containerId: 'viewer-container',
+                    endpointUri: '/parts/housing.scs'
+                });
+
+                viewer.setCallbacks({
+                    sceneReady: function() {
+                        updateStatus('✅ Scene ready! Housing model loaded successfully!');
+
+                        const view = viewer.getView();
+                        view.setBackgroundColor(
+                            new Communicator.Color(240, 240, 245),
+                            new Communicator.Color(200, 200, 210)
+                        );
+
+                        const axisTriad = view.getAxisTriad();
+                        axisTriad.enable();
+                        axisTriad.setAnchor(Communicator.OverlayAnchor.LowerLeftCorner);
+                    },
+                    modelStructureReady: function() {
+                        updateStatus('✅ Model structure ready! View fitting...');
+                        const view = viewer.getView();
+                        view.fitWorld();
+                    }
+                });
+
+                updateStatus('Starting viewer...');
+                viewer.start()
+                    .then(function() {
+                        updateStatus('✅ Viewer started successfully!');
+                    })
+                    .catch(function(error) {
+                        updateStatus('❌ ERROR starting viewer: ' + error.message);
+                        console.error('Viewer start error:', error);
+                    });
+
+            } catch (error) {
+                updateStatus('❌ ERROR creating viewer: ' + error.message);
+                console.error('Viewer creation error:', error);
+            }
+        });
+    </script>
+</body>
+</html>
