@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, FolderOpen, Trash2, Pencil } from "lucide-react";
+import { deleteSceneConfig } from "@/lib/sceneStorage";
 
 export function ScenesList() {
 	const [scenes, setScenes] = useState<Scene[]>([]);
@@ -101,12 +102,23 @@ export function ScenesList() {
 
 	async function deleteScene(scene: Scene) {
 		try {
+			// 1. Delete from Storage first
+			try {
+				await deleteSceneConfig(scene.id);
+				console.log(`Deleted storage config for scene: ${scene.id}`);
+			} catch (storageErr) {
+				// Log but don't fail - storage file might not exist
+				console.warn("Storage delete failed (might not exist):", storageErr);
+			}
+
+			// 2. Delete from database
 			const { error: deleteError } = await supabase
 				.from("scenes")
 				.delete()
 				.eq("id", scene.id);
 
 			if (deleteError) throw deleteError;
+
 			setDeletingScene(null);
 			await loadScenes();
 		} catch (err) {

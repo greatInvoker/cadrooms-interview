@@ -6,21 +6,23 @@ declare global {
     // Main WebViewer class
     class WebViewer {
       constructor(config: ViewerConfig);
+      // Direct properties
+      model: Model;
+      view: View;
+      selectionManager: SelectionManager;
+      operatorManager: OperatorManager;
+      // Scene management
       start(): Promise<void>;
       shutdown(): Promise<void>;
-
-      // Model loading
-      loadSubtreeFromScsFile(
-        parentNodeId: NodeId,
-        scsFile: string
-      ): Promise<NodeId>;
-
-      // Scene management
       getModel(): Model;
       getView(): View;
       getSelectionManager(): SelectionManager;
       getOperatorManager(): OperatorManager;
-
+      // Model loading
+      loadSubtreeFromScsFile(
+        parentNodeId: NodeId,
+        scsFile: string
+      ): Promise<NodeId[]>;
       // Callbacks
       setCallbacks(callbacks: ViewerCallbacks): void;
     }
@@ -50,6 +52,12 @@ declare global {
       getNodeChildren(nodeId: NodeId): NodeId[];
       getRootNode(): NodeId;
       deleteNode(nodeId: NodeId): void;
+      loadSubtreeFromScsFile(
+        parentNodeId: NodeId,
+        scsFile: string
+      ): Promise<NodeId[]>;
+      setNodesVisibility(nodeIds: NodeId[], visible: boolean): void;
+      clear(): Promise<void>;
     }
 
     // View class
@@ -108,6 +116,7 @@ declare global {
     // Matrix (4x4 transformation matrix)
     class Matrix {
       constructor();
+      m: number[]; // 16-element array representing the 4x4 matrix
       static createFromArray(values: number[]): Matrix;
       getAsArray(): number[];
       setTranslationComponent(x: number, y: number, z: number): void;
