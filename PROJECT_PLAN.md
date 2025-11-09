@@ -82,60 +82,70 @@
   - "Edit Info" 按钮 → 编辑场景元数据
   - 组件切换流程完整
 
+### Day 3 已完成
+
+**用户体验优化**
+
+- [x] 简化创建场景步骤
+  - [x] 参考 figma、photoshop 等软件工作流畅，用户点击`create scence`后直接进入场景界面，且在用户创建后再询问是否保存
+  - [x] 提供快速编辑场景`name`和`description`的按钮
+- [x] UI 风格优化
+  - [x] 采用更符合欧美市场的`ShadCN UI`和`Radix UI`库及风格
+  - [x] 完成`taildwind`相关依赖配置，引入常用 UI 组件
+- [x] 状态提示优化
+  - [x] 添加 Viewer 初始化进度提示
+  - [x] 添加零件加载 loading 状态
+  - [x] 添加场景保存/加载进度提示
+  - [x] 优化错误提示的显示方式
+- [x] 视觉反馈改进
+  - [x] 统一按钮样式和禁用状态
+  - [x] 添加零件加载成功的动画
+  - [x] 优化拖拽区域的边框样式
+
+**HOOPS Viewer 初始化完善**
+
+- [x] 调试 SceneViewer 初始化流程
+  - [x] 确认 `sceneReady` 回调触发机制
+  - [x] 修复 Viewer "初始化中" 卡住问题
+- [x] 验证 3D 模型加载
+  - [x] 测试 housing.scs 首次加载
+  - [x] 确保进入场景后立即看到 3D 视图
+
+**拖拽功能完善**
+
+- [x] 确保拖拽后立即显示 3D 模型
+
+**Supabase Storage 配置**
+
+- [x] 创建 `scene-configs` Storage bucket
+- [x] 配置访问策略，公开读取权限
+- [x] 测试 Storage 访问
+
+**场景持久化实现**
+
+- [x] 设计场景配置格式
+  - [x] 定义 SceneConfig TypeScript 类型
+  - [x] 设计 JSON 结构（零件列表、变换矩阵）
+- [x] 实现保存功能
+  - [x] 获取所有已加载零件的 NodeId
+  - [x] 获取每个零件的变换矩阵
+  - [x] 序列化为 JSON
+  - [x] 上传到 Supabase Storage
+  - [x] 更新 scenes 表的 `assets` 字段
+- [x] 实现加载功能
+  - [x] 从 Storage 读取场景配置
+  - [x] 按顺序加载零件文件
+  - [x] 恢复每个零件的变换矩阵
+  - [x] 显示加载进度
+
 **项目文档**
 
 - [x] CLAUDE.md - Claude Code 使用指南
-- [x] public/parts/README.md - 零件目录说明
 - [x] PROJECT_PLAN - CADRooms Interview Project - 进度报告
 
 ---
 
 ## ⏳ 待完成部分
-
-### 核心功能修复
-
-**HOOPS Viewer 初始化问题** 🔴 高优先级
-
-- [ ] 修复 Viewer "初始化中" 卡住的问题
-- [ ] 确保进入场景后能立即显示 3D 模型
-- [ ] 验证 housing.scs 能正确加载
-- [ ] 修复 sceneReady 回调未触发的问题
-- [ ] 测试所有已下载零件都能正常显示
-
-**拖拽功能完善**
-
-- [ ] 确保拖拽零件后能立即显示 3D 模型
-- [ ] 优化拖拽位置计算
-- [ ] 添加拖拽过程中的视觉反馈
-- [ ] 测试不同零件的拖拽效果
-
----
-
-### 零件库完善
-
-**下载剩余零件文件**
-
-- [ ] 下载 9 个缺失的零件 .scs 文件和缩略图：
-  - axe.scs/.png
-  - bearing_pr_dw.scs/.png
-  - bearing_pr_up.scs/.png
-  - housing_back.scs/.png
-  - housing_front.scs/.png
-  - housing_top.scs/.png
-  - push_rod.scs/.png
-  - screw_back.scs/.png
-  - screw_top.scs/.png
-- [ ] 验证所有 15 个零件都能正常加载和显示
-
----
-
-### Supabase Storage 集成
-
-**Storage 配置**
-
-- [ ] 创建 Supabase Storage bucket (scene-assets)
-- [ ] 配置 bucket 公开访问策略
-- [ ] 设置文件上传权限（RLS policies）
 
 **文件上传功能**
 
@@ -186,17 +196,8 @@
 
 **状态提示**
 
-- [ ] 添加 Viewer 初始化进度提示
 - [ ] 添加零件加载进度提示
 - [ ] 添加场景保存/加载进度提示
-- [ ] 优化错误提示信息
-
-**视觉反馈**
-
-- [ ] 改进拖拽时的边框高亮效果
-- [ ] 添加零件加载成功的提示动画
-- [ ] 优化按钮禁用状态的视觉效果
-- [ ] 统一 UI 风格
 
 **错误处理**
 
@@ -316,19 +317,9 @@
 
 ## 📋 关键任务优先级
 
-### 🔴 P0 - 必须完成（阻塞性问题）
-
-1. 修复 Viewer 初始化问题
-2. 确保拖拽零件能正确显示 3D 模型
-3. 场景保存/加载功能实现
-4. README 文档编写
-
 ### 🟡 P1 - 应该完成（重要功能）
 
-1. 下载剩余 9 个零件文件
-2. Supabase Storage 配置和集成
-3. 用户体验优化（加载提示、错误处理）
-4. 代码清理和类型安全
+1. 代码清理和类型安全
 
 ### 🟢 P2 - 可选完成（增强功能）
 
@@ -339,72 +330,10 @@
 
 ---
 
-## 📂 项目文件结构
-
-```
-take-home/
-├── public/
-│   └── parts/
-│       ├── parts_list.json          # 15个零件清单
-│       ├── housing.scs/.png         # ✅ 已下载
-│       ├── piston.scs/.png          # ✅ 已下载
-│       ├── crankshaft.scs/.png      # ✅ 已下载
-│       ├── bearing_CS.scs/.png      # ✅ 已下载
-│       ├── cylinder_liner.scs/.png  # ✅ 已下载
-│       ├── carburetor.scs/.png      # ✅ 已下载
-│       └── ... (9个待下载)
-├── src/
-│   ├── components/
-│   │   ├── ScenesList.tsx          # ✅ 场景列表（CRUD）
-│   │   ├── SceneViewer.tsx         # ✅ 场景查看器
-│   │   ├── SceneEditor.tsx         # ✅ 场景编辑器
-│   │   └── PartsList.tsx           # ✅ 零件列表
-│   ├── lib/
-│   │   └── supabase.ts             # ✅ Supabase 客户端
-│   ├── types/
-│   │   ├── index.ts                # ✅ Scene 类型定义
-│   │   └── hoops.d.ts              # ✅ HOOPS Viewer 类型
-│   ├── App.tsx                     # ✅ 主应用组件
-│   └── main.tsx                    # ✅ 应用入口
-├── supabase/
-│   └── migrations/
-│       └── 20250108000000_create_scenes_table.sql  # ✅ 数据库迁移
-├── .env.local                      # ✅ 环境变量
-├── index.html                      # ✅ HTML 入口（含 HOOPS CDN）
-├── CLAUDE.md                       # ✅ Claude Code 指南
-├── README.md                       # ⏳ 待完善
-├── PROJECT_PLAN.md                 # ✅ 项目计划
-└── package.json                    # ✅ 项目配置
-```
-
----
-
-## 🎯 当前状态
-
-**当前可运行：**
-
-- ✅ 开发服务器：http://localhost:5173/
-- ✅ 场景列表页面
-- ✅ 场景 CRUD 功能
-- ✅ SceneViewer 和 SceneEditor 组件框架
-
-**当前问题：**
-
-- ⚠️ Viewer 显示"初始化中"，未正确加载 3D 模型
-- ⚠️ 拖拽零件后无法显示 3D 模型
-- ⚠️ 缺少 9 个零件文件
-
-**下一步行动：**
-
-1. 修复 Viewer 初始化问题
-2. 验证拖拽功能正常工作
-3. 完成场景持久化功能
-
----
-
 ## 📞 技术支持资源
 
 - **HOOPS Web Viewer 文档**: https://docs.techsoft3d.com/hoops/visualize-web/
 - **assembly_creator 源码**: https://github.com/techsoft3d/assembly_creator
 - **Supabase 文档**: https://supabase.com/docs
+- **UI 库**: https://ui.shadcn.com/
 - **项目需求**: https://github.com/wikifactory/cadrooms-interview
