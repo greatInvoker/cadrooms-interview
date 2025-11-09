@@ -2,6 +2,29 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { Scene } from "../types";
 import { PartsList } from "./PartsList";
+import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Save, X, Trash2 } from "lucide-react";
 import "../types/hoops.d.ts";
 
 interface SceneEditorProps {
@@ -25,21 +48,46 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
   const [status, setStatus] = useState<string>("Initializing...");
   const [selectedNodeId, setSelectedNodeId] = useState<Communicator.NodeId | null>(null);
 
+  // 新增状态
+  const isNewScene = sceneId === "new";
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [shouldExitAfterSave, setShouldExitAfterSave] = useState(false);
+  const [formData, setFormData] = useState({ name: "", description: "" });
+
   useEffect(() => {
+    let mounted = true;
+
     async function init() {
       try {
         setStatus("Loading scene data...");
 
-        const { data, error: fetchError } = await supabase
-          .from("scenes")
-          .select("*")
-          .eq("id", sceneId)
-          .single();
+        // 如果是新场景，不从数据库加载
+        if (!isNewScene) {
+          const { data, error: fetchError } = await supabase
+            .from("scenes")
+            .select("*")
+            .eq("id", sceneId)
+            .single();
 
-        if (fetchError) throw fetchError;
-        if (!data) throw new Error("Scene not found");
+          if (fetchError) throw fetchError;
+          if (!data) throw new Error("Scene not found");
 
-        setScene(data);
+          if (!mounted) return;
+          setScene(data);
+        } else {
+          // 新场景使用默认数据
+          if (!mounted) return;
+          setScene({
+            id: "new",
+            name: "Untitled Scene",
+            description: "",
+            assets: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as Scene);
+        }
 
         const response = await fetch("/parts/parts_list.json");
         const partsData = await response.json();
@@ -51,6 +99,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
           thumbnail: `/parts/${part.name}.png`,
         }));
 
+        if (!mounted) return;
         setParts(loadedParts);
 
         setStatus("Initializing 3D editor...");
@@ -58,18 +107,29 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
       } catch (err) {
         console.error("Initialization error:", err);
-        setStatus(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+        if (mounted) {
+          setStatus(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+        }
       }
     }
 
     init();
 
     return () => {
+      mounted = false;
       if (viewerRef.current) {
-        viewerRef.current.shutdown().catch(console.error);
+        try {
+          const shutdownPromise = viewerRef.current.shutdown();
+          if (shutdownPromise && typeof shutdownPromise.catch === 'function') {
+            shutdownPromise.catch(console.error);
+          }
+        } catch (err) {
+          console.error('Shutdown error:', err);
+        }
+        viewerRef.current = null;
       }
     };
-  }, [sceneId]);
+  }, [sceneId, isNewScene]);
 
   async function initViewer() {
     return new Promise<void>((resolve, reject) => {
@@ -177,9 +237,11 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
         viewer.getView().fitWorld();
       }, 100);
 
+      // 标记场景有修改
+      setHasChanges(true);
+
     } catch (err) {
       console.error("Drop failed:", err);
-      alert(`Failed to load part: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
   }
 
@@ -190,7 +252,6 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
   function handleDelete() {
     if (!selectedNodeId || !viewerRef.current) {
-      alert("No part selected");
       return;
     }
 
@@ -198,15 +259,123 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
       const model = viewerRef.current.getModel();
       model.deleteNode(selectedNodeId);
       setSelectedNodeId(null);
+      setHasChanges(true); // 标记有修改
     } catch (err) {
       console.error("Delete failed:", err);
-      alert("Failed to delete part");
     }
   }
 
-  async function handleSave() {
-    if (!scene) return;
+  // 处理关闭 - 检查是否有修改
+  function handleClose() {
+    if (hasChanges) {
+      // 有修改，提示保存
+      setShowExitConfirm(true);
+    } else {
+      // 没有修改，直接关闭
+      if (onClose) onClose();
+    }
+  }
 
+  // 确认退出不保存
+  function confirmExitWithoutSave() {
+    setShowExitConfirm(false);
+    if (onClose) onClose();
+  }
+
+  // 保存并退出（从退出确认对话框调用）
+  async function saveAndExit() {
+    setShowExitConfirm(false);
+
+    if (isNewScene) {
+      // 新场景需要命名，显示保存对话框
+      // 设置标记表示保存后要退出
+      setShouldExitAfterSave(true);
+      setShowSaveDialog(true);
+    } else {
+      // 已有场景，直接保存并退出
+      try {
+        const { error } = await supabase
+          .from("scenes")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", sceneId);
+
+        if (error) throw error;
+
+        if (onSave) onSave();
+        if (onClose) onClose();
+      } catch (err) {
+        console.error("Save failed:", err);
+      }
+    }
+  }
+
+  // 保存场景
+  async function handleSaveScene() {
+    if (!formData.name.trim()) return;
+
+    try {
+      if (isNewScene) {
+        // 新场景 - 创建到数据库
+        const { data, error } = await supabase
+          .from("scenes")
+          .insert({
+            name: formData.name,
+            description: formData.description,
+            assets: []
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setShowSaveDialog(false);
+        setHasChanges(false);
+
+        if (onSave) onSave();
+
+        // 如果是从saveAndExit调用的，则退出
+        if (shouldExitAfterSave) {
+          setShouldExitAfterSave(false);
+          if (onClose) onClose();
+        }
+      } else {
+        // 更新已有场景
+        const { error } = await supabase
+          .from("scenes")
+          .update({
+            name: formData.name,
+            description: formData.description,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", sceneId);
+
+        if (error) throw error;
+
+        setShowSaveDialog(false);
+        setHasChanges(false);
+
+        if (onSave) onSave();
+
+        // 如果是从saveAndExit调用的，则退出
+        if (shouldExitAfterSave) {
+          setShouldExitAfterSave(false);
+          if (onClose) onClose();
+        }
+      }
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
+  }
+
+  // 快速保存（已有场景）
+  async function quickSave() {
+    if (isNewScene) {
+      // 新场景需要命名
+      setShowSaveDialog(true);
+      return;
+    }
+
+    // 更新已有场景
     try {
       const { error } = await supabase
         .from("scenes")
@@ -214,129 +383,146 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
         .eq("id", sceneId);
 
       if (error) throw error;
+      setHasChanges(false);
 
-      alert("Scene saved!");
       if (onSave) onSave();
+      // 保存后不关闭，让用户继续工作
     } catch (err) {
-      alert(`Failed to save: ${err instanceof Error ? err.message : "Unknown error"}`);
+      console.error("Save failed:", err);
     }
   }
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <div
-        style={{
-          padding: "15px 20px",
-          borderBottom: "1px solid #ddd",
-          backgroundColor: "#f8f9fa",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
+    <div className="h-screen flex flex-col">
+      {/* Header */}
+      <div className="px-6 py-4 border-b bg-background flex justify-between items-center">
         <div>
-          <h2 style={{ margin: 0, fontSize: "20px" }}>
-            Editing: {scene?.name || "Scene"}
+          <h2 className="text-2xl font-bold">
+            {scene?.name || "Scene"}
+            {hasChanges && <span className="text-muted-foreground text-sm ml-2">(Unsaved changes)</span>}
           </h2>
           {scene?.description && (
-            <p style={{ margin: "5px 0 0 0", color: "#666", fontSize: "14px" }}>
+            <p className="text-sm text-muted-foreground mt-1">
               {scene.description}
             </p>
           )}
         </div>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <span style={{ fontSize: "12px", color: status.includes("Ready") ? "#28a745" : "#ff9800" }}>
+        <div className="flex gap-2 items-center">
+          <span className={`text-xs ${status.includes("Ready") ? "text-green-600" : "text-orange-500"}`}>
             {status}
           </span>
-          <button
-            onClick={handleSave}
-            style={{
-              padding: "8px 16px",
-              backgroundColor: "#28a745",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
-          >
+          <Button onClick={quickSave} size="sm">
+            <Save className="mr-2 h-4 w-4" />
             Save
-          </button>
+          </Button>
           {onClose && (
-            <button
-              onClick={onClose}
-              style={{
-                padding: "8px 16px",
-                backgroundColor: "#6c757d",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
+            <Button onClick={handleClose} variant="outline" size="sm">
+              <X className="mr-2 h-4 w-4" />
               Close
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
-      <div
-        style={{
-          padding: "10px 20px",
-          borderBottom: "1px solid #ddd",
-          backgroundColor: "#fff",
-          display: "flex",
-          gap: "10px",
-          alignItems: "center",
-        }}
-      >
-        <button
+      {/* Toolbar */}
+      <div className="px-6 py-3 border-b bg-muted/30 flex gap-2 items-center">
+        <Button
           onClick={handleDelete}
           disabled={!selectedNodeId}
-          style={{
-            padding: "6px 12px",
-            backgroundColor: "#dc3545",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            opacity: selectedNodeId ? 1 : 0.5,
-          }}
-        >
+          variant="destructive"
+          size="sm">
+          <Trash2 className="mr-2 h-4 w-4" />
           Delete Selected
-        </button>
-        <span style={{ fontSize: "12px", color: "#666", marginLeft: "auto" }}>
+        </Button>
+        <span className="text-xs text-muted-foreground ml-auto">
           {selectedNodeId ? `Selected: Node ${selectedNodeId}` : "No selection"}
         </span>
       </div>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
         <div
           ref={containerRef}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
-          style={{
-            flex: 1,
-            position: "relative",
-            backgroundColor: "#f5f5fa",
-          }}
+          className="flex-1 relative bg-background"
         />
 
-        <div style={{ width: "300px", flexShrink: 0 }}>
+        <div className="w-80 flex-shrink-0 border-l">
           <PartsList parts={parts} />
         </div>
       </div>
 
-      <div
-        style={{
-          padding: "10px 20px",
-          borderTop: "1px solid #ddd",
-          backgroundColor: "#f8f9fa",
-          fontSize: "12px",
-          color: "#666",
-        }}
-      >
+      {/* Footer */}
+      <div className="px-6 py-3 border-t bg-muted/30 text-xs text-muted-foreground">
         {parts.length} parts available | Drag to add, click to select, delete to remove
       </div>
+
+      {/* Save Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Scene</DialogTitle>
+            <DialogDescription>
+              Enter a name and description for your scene
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="save-name">
+                Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="save-name"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                placeholder="Enter scene name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="save-description">Description</Label>
+              <Textarea
+                id="save-description"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder="Enter scene description (optional)"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveScene} disabled={!formData.name.trim()}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Exit Confirmation Dialog */}
+      <AlertDialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save your work?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Do you want to save this scene before closing?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={confirmExitWithoutSave}>
+              Don't Save
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={saveAndExit}>
+              Save
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

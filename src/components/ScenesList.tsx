@@ -1,18 +1,48 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { Scene } from "../types";
-import { SceneViewer } from "./SceneViewer";
 import { SceneEditor } from "./SceneEditor";
+import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, FolderOpen, Trash2, Pencil } from "lucide-react";
 
 export function ScenesList() {
 	const [scenes, setScenes] = useState<Scene[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [showCreateForm, setShowCreateForm] = useState(false);
-	const [editingScene, setEditingScene] = useState<Scene | null>(null);
+	const [editingMetaScene, setEditingMetaScene] = useState<Scene | null>(null);
 	const [formData, setFormData] = useState({ name: "", description: "" });
-	const [viewingSceneId, setViewingSceneId] = useState<string | null>(null);
 	const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
+	const [isCreatingNew, setIsCreatingNew] = useState(false);
+	const [deletingScene, setDeletingScene] = useState<Scene | null>(null);
 
 	async function loadScenes() {
 		try {
@@ -32,30 +62,24 @@ export function ScenesList() {
 		}
 	}
 
-	async function createScene() {
-		if (!formData.name.trim()) {
-			alert("Scene name is required");
-			return;
-		}
-
-		try {
-			const { error: insertError } = await supabase
-				.from("scenes")
-				.insert({ name: formData.name, description: formData.description });
-
-			if (insertError) throw insertError;
-
-			setFormData({ name: "", description: "" });
-			setShowCreateForm(false);
-			await loadScenes();
-		} catch (err) {
-			alert(err instanceof Error ? err.message : "Failed to create scene");
-		}
+	// 点击 "Create Scene" - 直接进入编辑器
+	function startCreateNewScene() {
+		setIsCreatingNew(true);
+		setEditingSceneId("new"); // 使用特殊标识符表示新场景
 	}
 
-	async function updateScene() {
-		if (!editingScene || !formData.name.trim()) {
-			alert("Scene name is required");
+	function startEditMeta(scene: Scene) {
+		setEditingMetaScene(scene);
+		setFormData({ name: scene.name, description: scene.description || "" });
+	}
+
+	function cancelEditMeta() {
+		setEditingMetaScene(null);
+		setFormData({ name: "", description: "" });
+	}
+
+	async function updateSceneMeta() {
+		if (!editingMetaScene || !formData.name.trim()) {
 			return;
 		}
 
@@ -63,73 +87,46 @@ export function ScenesList() {
 			const { error: updateError } = await supabase
 				.from("scenes")
 				.update({ name: formData.name, description: formData.description })
-				.eq("id", editingScene.id);
+				.eq("id", editingMetaScene.id);
 
 			if (updateError) throw updateError;
 
 			setFormData({ name: "", description: "" });
-			setEditingScene(null);
+			setEditingMetaScene(null);
 			await loadScenes();
 		} catch (err) {
-			alert(err instanceof Error ? err.message : "Failed to update scene");
+			setError(err instanceof Error ? err.message : "Failed to update scene");
 		}
 	}
 
-	async function deleteScene(id: string, name: string) {
-		if (!confirm(`Are you sure you want to delete "${name}"?`)) {
-			return;
-		}
-
+	async function deleteScene(scene: Scene) {
 		try {
 			const { error: deleteError } = await supabase
 				.from("scenes")
 				.delete()
-				.eq("id", id);
+				.eq("id", scene.id);
 
 			if (deleteError) throw deleteError;
+			setDeletingScene(null);
 			await loadScenes();
 		} catch (err) {
-			alert(err instanceof Error ? err.message : "Failed to delete scene");
+			setError(err instanceof Error ? err.message : "Failed to delete scene");
 		}
-	}
-
-	function startEdit(scene: Scene) {
-		setEditingScene(scene);
-		setFormData({ name: scene.name, description: scene.description || "" });
-		setShowCreateForm(false);
-	}
-
-	function cancelEdit() {
-		setEditingScene(null);
-		setFormData({ name: "", description: "" });
-	}
-
-	function startCreate() {
-		setShowCreateForm(true);
-		setEditingScene(null);
-		setFormData({ name: "", description: "" });
 	}
 
 	useEffect(() => {
 		loadScenes();
 	}, []);
 
-	// Show viewer if viewing a scene
-	if (viewingSceneId) {
-		return (
-			<SceneViewer
-				sceneId={viewingSceneId}
-				onClose={() => setViewingSceneId(null)}
-			/>
-		);
-	}
-
 	// Show editor if editing a scene
 	if (editingSceneId) {
 		return (
 			<SceneEditor
 				sceneId={editingSceneId}
-				onClose={() => setEditingSceneId(null)}
+				onClose={() => {
+					setEditingSceneId(null);
+					loadScenes();
+				}}
 				onSave={() => {
 					setEditingSceneId(null);
 					loadScenes();
@@ -139,215 +136,172 @@ export function ScenesList() {
 	}
 
 	if (loading) {
-		return <div style={{ padding: "20px" }}>Loading scenes...</div>;
+		return (
+			<div className="flex items-center justify-center min-h-screen">
+				<p className="text-muted-foreground">Loading scenes...</p>
+			</div>
+		);
 	}
 
 	if (error) {
 		return (
-			<div style={{ padding: "20px", color: "red" }}>
-				Error: {error}
-				<button onClick={loadScenes} style={{ marginLeft: "10px" }}>
-					Retry
-				</button>
+			<div className="flex flex-col items-center justify-center min-h-screen gap-4">
+				<p className="text-destructive">Error: {error}</p>
+				<Button onClick={loadScenes}>Retry</Button>
 			</div>
 		);
 	}
 
 	return (
-		<div style={{ padding: "20px", maxWidth: "800px", margin: "0 auto" }}>
-			<div
-				style={{
-					display: "flex",
-					justifyContent: "space-between",
-					alignItems: "center",
-					marginBottom: "20px",
-				}}>
-				<h1>Scenes</h1>
-				<button
-					onClick={startCreate}
-					style={{
-						padding: "10px 20px",
-						backgroundColor: "#007bff",
-						color: "white",
-						border: "none",
-						borderRadius: "4px",
-						cursor: "pointer",
-					}}>
-					Create New Scene
-				</button>
+		<div className="container mx-auto py-8 px-4 max-w-6xl">
+			<div className="flex justify-between items-center mb-8">
+				<div>
+					<h1 className="text-4xl font-bold tracking-tight">Scenes</h1>
+					<p className="text-muted-foreground mt-2">
+						Manage your 3D scenes and assemblies
+					</p>
+				</div>
+				<Button onClick={startCreateNewScene} size="lg">
+					<Plus className="mr-2 h-4 w-4" />
+					Create Scene
+				</Button>
 			</div>
 
-			{(showCreateForm || editingScene) && (
-				<div
-					style={{
-						padding: "20px",
-						border: "1px solid #ddd",
-						borderRadius: "4px",
-						marginBottom: "20px",
-						backgroundColor: "#f9f9f9",
-					}}>
-					<h2>{editingScene ? "Edit Scene" : "Create New Scene"}</h2>
-					<div style={{ marginBottom: "10px" }}>
-						<label style={{ display: "block", marginBottom: "5px" }}>
-							Name <span style={{ color: "red" }}>*</span>
-						</label>
-						<input
-							type="text"
-							value={formData.name}
-							onChange={(e) =>
-								setFormData({ ...formData, name: e.target.value })
-							}
-							style={{
-								width: "100%",
-								padding: "8px",
-								border: "1px solid #ccc",
-								borderRadius: "4px",
-							}}
-							placeholder="Enter scene name"
-						/>
-					</div>
-					<div style={{ marginBottom: "15px" }}>
-						<label style={{ display: "block", marginBottom: "5px" }}>
-							Description
-						</label>
-						<textarea
-							value={formData.description}
-							onChange={(e) =>
-								setFormData({ ...formData, description: e.target.value })
-							}
-							style={{
-								width: "100%",
-								padding: "8px",
-								border: "1px solid #ccc",
-								borderRadius: "4px",
-								minHeight: "80px",
-							}}
-							placeholder="Enter scene description"
-						/>
-					</div>
-					<div style={{ display: "flex", gap: "10px" }}>
-						<button
-							onClick={editingScene ? updateScene : createScene}
-							style={{
-								padding: "8px 16px",
-								backgroundColor: "#28a745",
-								color: "white",
-								border: "none",
-								borderRadius: "4px",
-								cursor: "pointer",
-							}}>
-							{editingScene ? "Update" : "Create"}
-						</button>
-						<button
-							onClick={() => {
-								setShowCreateForm(false);
-								cancelEdit();
-							}}
-							style={{
-								padding: "8px 16px",
-								backgroundColor: "#6c757d",
-								color: "white",
-								border: "none",
-								borderRadius: "4px",
-								cursor: "pointer",
-							}}>
-							Cancel
-						</button>
-					</div>
-				</div>
-			)}
-
 			{scenes.length === 0 ? (
-				<p style={{ textAlign: "center", color: "#666", padding: "40px 0" }}>
-					No scenes yet. Create your first scene!
-				</p>
+				<Card className="text-center py-12">
+					<CardHeader>
+						<CardTitle>No scenes yet</CardTitle>
+						<CardDescription>
+							Get started by creating your first 3D scene
+						</CardDescription>
+					</CardHeader>
+					<CardFooter className="justify-center">
+						<Button onClick={startCreateNewScene} size="lg">
+							<Plus className="mr-2 h-4 w-4" />
+							Create Your First Scene
+						</Button>
+					</CardFooter>
+				</Card>
 			) : (
-				<div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 					{scenes.map((scene) => (
-						<div
-							key={scene.id}
-							style={{
-								padding: "15px",
-								border: "1px solid #ddd",
-								borderRadius: "4px",
-								backgroundColor: "white",
-							}}>
-							<div
-								style={{
-									display: "flex",
-									justifyContent: "space-between",
-									alignItems: "start",
-								}}>
-								<div style={{ flex: 1 }}>
-									<h3 style={{ margin: "0 0 8px 0" }}>{scene.name}</h3>
-									{scene.description && (
-										<p style={{ margin: "0 0 8px 0", color: "#666" }}>
-											{scene.description}
-										</p>
-									)}
-									<div style={{ fontSize: "12px", color: "#999" }}>
-										<div>Assets: {scene.assets.length}</div>
-										<div>
-											Last updated:{" "}
-											{new Date(scene.updated_at).toLocaleString()}
-										</div>
+						<Card key={scene.id} className="hover:shadow-lg transition-shadow">
+							<CardHeader className="relative">
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={() => startEditMeta(scene)}
+									className="absolute right-4 top-4 h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+									title="Edit scene info">
+									<Pencil className="h-4 w-4" />
+								</Button>
+								<CardTitle className="pr-10">{scene.name}</CardTitle>
+								{scene.description && (
+									<CardDescription>{scene.description}</CardDescription>
+								)}
+							</CardHeader>
+							<CardContent>
+								<div className="space-y-1 text-sm text-muted-foreground">
+									<div>Assets: {scene.assets.length}</div>
+									<div>
+										Updated: {new Date(scene.updated_at).toLocaleDateString()}
 									</div>
 								</div>
-								<div style={{ display: "flex", gap: "8px" }}>
-									<button
-										onClick={() => setViewingSceneId(scene.id)}
-										style={{
-											padding: "6px 12px",
-											backgroundColor: "#17a2b8",
-											color: "white",
-											border: "none",
-											borderRadius: "4px",
-											cursor: "pointer",
-										}}>
-										View
-									</button>
-									<button
-										onClick={() => setEditingSceneId(scene.id)}
-										style={{
-											padding: "6px 12px",
-											backgroundColor: "#28a745",
-											color: "white",
-											border: "none",
-											borderRadius: "4px",
-											cursor: "pointer",
-										}}>
-										Edit 3D
-									</button>
-									<button
-										onClick={() => startEdit(scene)}
-										style={{
-											padding: "6px 12px",
-											backgroundColor: "#ffc107",
-											color: "black",
-											border: "none",
-											borderRadius: "4px",
-											cursor: "pointer",
-										}}>
-										Edit Info
-									</button>
-									<button
-										onClick={() => deleteScene(scene.id, scene.name)}
-										style={{
-											padding: "6px 12px",
-											backgroundColor: "#dc3545",
-											color: "white",
-											border: "none",
-											borderRadius: "4px",
-											cursor: "pointer",
-										}}>
-										Delete
-									</button>
-								</div>
-							</div>
-						</div>
+							</CardContent>
+							<CardFooter className="flex justify-between items-center pl-6 pr-4 pb-6 pt-0">
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setEditingSceneId(scene.id)}>
+									<FolderOpen className="mr-2 h-4 w-4" />
+									Open
+								</Button>
+								<Button
+									variant="destructive"
+									size="sm"
+									onClick={() => setDeletingScene(scene)}>
+									<Trash2 className="h-4 w-4" />
+								</Button>
+							</CardFooter>
+						</Card>
 					))}
 				</div>
 			)}
+
+			{/* Edit Scene Meta Dialog */}
+			<Dialog
+				open={!!editingMetaScene}
+				onOpenChange={(open) => {
+					if (!open) {
+						cancelEditMeta();
+					}
+				}}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Edit Scene</DialogTitle>
+						<DialogDescription>
+							Update the scene information
+						</DialogDescription>
+					</DialogHeader>
+					<div className="space-y-4 py-4">
+						<div className="space-y-2">
+							<Label htmlFor="name">
+								Name <span className="text-destructive">*</span>
+							</Label>
+							<Input
+								id="name"
+								value={formData.name}
+								onChange={(e) =>
+									setFormData({ ...formData, name: e.target.value })
+								}
+								placeholder="Enter scene name"
+							/>
+						</div>
+						<div className="space-y-2">
+							<Label htmlFor="description">Description</Label>
+							<Textarea
+								id="description"
+								value={formData.description}
+								onChange={(e) =>
+									setFormData({ ...formData, description: e.target.value })
+								}
+								placeholder="Enter scene description (optional)"
+							/>
+						</div>
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={cancelEditMeta}>
+							Cancel
+						</Button>
+						<Button onClick={updateSceneMeta} disabled={!formData.name.trim()}>
+							Update
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Delete Confirmation Dialog */}
+			<AlertDialog
+				open={!!deletingScene}
+				onOpenChange={(open) => !open && setDeletingScene(null)}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Are you sure?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This will permanently delete "{deletingScene?.name}". This action
+							cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => deletingScene && deleteScene(deletingScene)}
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

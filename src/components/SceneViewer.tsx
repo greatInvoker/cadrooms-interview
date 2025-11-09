@@ -24,6 +24,8 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
   const [status, setStatus] = useState<string>("Initializing...");
 
   useEffect(() => {
+    let mounted = true;
+
     async function init() {
       try {
         setStatus("Loading scene data...");
@@ -37,6 +39,7 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
         if (fetchError) throw fetchError;
         if (!data) throw new Error("Scene not found");
 
+        if (!mounted) return;
         setScene(data);
 
         const response = await fetch("/parts/parts_list.json");
@@ -49,6 +52,7 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
           thumbnail: `/parts/${part.name}.png`,
         }));
 
+        if (!mounted) return;
         setParts(loadedParts);
 
         setStatus("Initializing 3D viewer...");
@@ -56,15 +60,26 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 
       } catch (err) {
         console.error("Initialization error:", err);
-        setStatus(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+        if (mounted) {
+          setStatus(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
+        }
       }
     }
 
     init();
 
     return () => {
+      mounted = false;
       if (viewerRef.current) {
-        viewerRef.current.shutdown().catch(console.error);
+        try {
+          const shutdownPromise = viewerRef.current.shutdown();
+          if (shutdownPromise && typeof shutdownPromise.catch === 'function') {
+            shutdownPromise.catch(console.error);
+          }
+        } catch (err) {
+          console.error('Shutdown error:', err);
+        }
+        viewerRef.current = null;
       }
     };
   }, [sceneId]);
