@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import type { Scene } from "../types";
+import type { Scene } from "../types/Scene";
 import { SceneEditor } from "./SceneEditor";
 import { Button } from "@/components/ui/button";
 import {
@@ -208,7 +208,7 @@ export function ScenesList() {
 							</CardHeader>
 							<CardContent>
 								<div className="space-y-1 text-sm text-muted-foreground">
-									<div>Assets: {scene.assets.length}</div>
+									<div>Parts: {scene.scene_json?.parts?.length || 0}</div>
 									<div>
 										Updated: {new Date(scene.updated_at).toLocaleDateString()}
 									</div>
