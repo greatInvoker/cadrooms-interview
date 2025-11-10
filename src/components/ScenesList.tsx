@@ -41,7 +41,6 @@ export function ScenesList() {
 	const [editingMetaScene, setEditingMetaScene] = useState<Scene | null>(null);
 	const [formData, setFormData] = useState({ name: "", description: "" });
 	const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
-	const [isCreatingNew, setIsCreatingNew] = useState(false);
 	const [deletingScene, setDeletingScene] = useState<Scene | null>(null);
 
 	async function loadScenes() {
@@ -65,7 +64,6 @@ export function ScenesList() {
 
 	// 点击 "Create Scene" - 直接进入编辑器
 	function startCreateNewScene() {
-		setIsCreatingNew(true);
 		setEditingSceneId("new"); // 使用特殊标识符表示新场景
 	}
 

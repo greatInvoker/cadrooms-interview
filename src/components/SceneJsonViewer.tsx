@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy, FileDown, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
-import type { SceneConfig } from "@/lib/sceneSerializer";
+import type { SceneConfig, PartConfig } from "@/lib/sceneSerializer";
 
 interface SceneJsonViewerProps {
 	viewer: Communicator.WebViewer | null;
 	onLoadJson?: (config: SceneConfig) => void;
 	onCollapse?: (collapsed: boolean) => void;
+	// Node metadata for preserving cadUrl and isPreset info
+	nodeMetadata?: Map<number, { cadUrl: string; isPreset: boolean }>;
 }
 
 export interface SceneJsonViewerHandle {
@@ -18,7 +20,7 @@ export interface SceneJsonViewerHandle {
 export const SceneJsonViewer = forwardRef<
 	SceneJsonViewerHandle,
 	SceneJsonViewerProps
->(({ viewer, onLoadJson, onCollapse }, ref) => {
+>(({ viewer, onLoadJson, onCollapse, nodeMetadata }, ref) => {
 	const [jsonText, setJsonText] = useState<string>("");
 	const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
@@ -89,12 +91,22 @@ export const SceneJsonViewer = forwardRef<
 
 			const children = model.getNodeChildren(rootNodeId);
 
+			// Preset parts list for fallback identification
+			const presetParts = new Set([
+				"axe",
+				"bearing_CS",
+				"bearing_pr_dw",
+				"bearing_pr_up",
+			]);
+
 			const parts: Array<{
 				fileName: string;
 				nodeId: number;
 				matrix: number[];
 				name: string;
 				visible: boolean;
+				cadUrl?: string;
+				isPreset?: boolean;
 			}> = [];
 
 			children.forEach((nodeId) => {
@@ -103,13 +115,33 @@ export const SceneJsonViewer = forwardRef<
 					const matrix = model.getNodeMatrix(nodeId);
 					const visible = model.getNodeVisibility(nodeId);
 
-					parts.push({
-						fileName: nodeName || `part_${nodeId}.scs`,
+					// Get metadata for this node if available
+					const metadata = nodeMetadata?.get(nodeId);
+					const fileName = nodeName || `part_${nodeId}.scs`;
+					const partBaseName = fileName.replace(/\.scs$/i, "");
+
+					const partData: any = {
+						fileName,
 						nodeId,
 						matrix: matrix.m,
 						name: nodeName || `part_${nodeId}`,
 						visible,
-					});
+					};
+
+					// Add cadUrl if available
+					if (metadata?.cadUrl) {
+						partData.cadUrl = metadata.cadUrl;
+					}
+
+					// Add isPreset flag
+					if (metadata?.isPreset !== undefined) {
+						partData.isPreset = metadata.isPreset;
+					} else {
+						// Fallback: check if it's a preset part by name
+						partData.isPreset = presetParts.has(partBaseName);
+					}
+
+					parts.push(partData);
 				} catch (err) {
 					console.error(`Failed to get data for node ${nodeId}:`, err);
 				}
@@ -133,23 +165,38 @@ export const SceneJsonViewer = forwardRef<
 		}
 	};
 
-	// 自定义JSON格式化：极度压缩格式，与assembly_creator一致
+	// 自定义JSON格式化：压缩格式，包含必要的加载信息
 	const formatCompactJson = (config: SceneConfig): string => {
 		if (config.parts.length === 0) {
 			return '{"parts":[]}';
 		}
 
-		// Parts: 每个零件极度压缩
+		// Parts: 每个零件压缩，包含 cadUrl 和 isPreset 信息
 		const partsCompact = config.parts
-			.map((part) => {
+			.map((part: PartConfig) => {
 				// 从fileName中提取零件名称（去掉.scs后缀）
 				const name = part.fileName.replace(/\.scs$/i, "");
 				const visibility = part.visible;
 				const matrix = part.matrix;
 
-				return `{"name":"${name}","visibility":${visibility},"matrix":[${matrix.join(
-					","
-				)}]}`;
+				// Build part JSON with optional fields
+				const partJson: any = {
+					name,
+					visibility,
+					matrix,
+				};
+
+				// Include cadUrl if available (for user uploaded parts)
+				if (part.cadUrl) {
+					partJson.cadUrl = part.cadUrl;
+				}
+
+				// Include isPreset flag
+				if (part.isPreset !== undefined) {
+					partJson.isPreset = part.isPreset;
+				}
+
+				return JSON.stringify(partJson);
 			})
 			.join(",");
 
@@ -190,13 +237,24 @@ export const SceneJsonViewer = forwardRef<
 			// Convert compressed format to full SceneConfig format
 			const config: SceneConfig = {
 				version: "1.0",
-				parts: compressedData.parts.map((part: any, index: number) => ({
-					fileName: part.name.endsWith(".scs") ? part.name : `${part.name}.scs`,
-					nodeId: 1000 + index, // Generate temporary nodeId
-					matrix: part.matrix,
-					name: part.name,
-					visible: part.visibility !== undefined ? part.visibility : true,
-				})),
+				parts: compressedData.parts.map((part: any, index: number) => {
+					// HOOPS may use spaces in node names, but files use underscores
+					// Normalize to use underscores for file matching
+					const normalizedName = part.name.replace(/\s+/g, "_");
+					const fileName = normalizedName.endsWith(".scs") ? normalizedName : `${normalizedName}.scs`;
+
+					return {
+						fileName,
+						nodeId: 1000 + index, // Generate temporary nodeId
+						matrix: part.matrix,
+						name: part.name,
+						visible: part.visibility !== undefined ? part.visibility : true,
+						// Include cadUrl if present (for user uploaded parts)
+						cadUrl: part.cadUrl,
+						// Include isPreset flag if present
+						isPreset: part.isPreset,
+					};
+				}),
 				metadata: {
 					sceneId: "loaded",
 					savedAt: new Date().toISOString(),

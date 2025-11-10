@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
-import type { Scene } from "../types";
+import type { Scene } from "../types/Scene";
 import { PartsList } from "./PartsList";
 import "../types/hoops.d.ts";
 import { deserializeScene, type SceneConfig } from "@/lib/sceneSerializer";
@@ -44,7 +44,7 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 				if (!mounted) return;
 				setScene(data);
 
-				const response = await fetch("/parts/parts_list.json");
+				const response = await fetch("/preset_parts/parts_list.json");
 				const partsData = await response.json();
 
 				const loadedParts: Part[] = partsData.parts.map(
@@ -54,7 +54,7 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 							.replace(/_/g, " ")
 							.replace(/\b\w/g, (l: string) => l.toUpperCase()),
 						fileName: `${part.name}.scs`,
-						thumbnail: `/parts/${part.name}.png`,
+						thumbnail: `/preset_parts/${part.name}.png`,
 					})
 				);
 
@@ -93,7 +93,7 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 
 	// Handle window resize with debounce
 	useEffect(() => {
-		let resizeTimeout: NodeJS.Timeout;
+		let resizeTimeout: ReturnType<typeof setTimeout>;
 
 		const handleResize = () => {
 			// Clear previous timeout
@@ -112,7 +112,7 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 			}, 300);
 		};
 
-		window.addEventListener("resize", handleResize);
+		window.addEventListener("resize", handleResize, { passive: true });
 
 		return () => {
 			window.removeEventListener("resize", handleResize);
@@ -179,6 +179,7 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 							console.log(
 								`Loading ${config.parts.length} parts from database`
 							);
+							// deserializeScene now returns metadata, but SceneViewer doesn't need to store it
 							await deserializeScene(viewer, config);
 							setStatus(`${config.parts.length} parts loaded`);
 						} else {
@@ -247,7 +248,7 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 			// loadSubtreeFromScsFile 返回 Promise<NodeId[]>
 			const nodeIds = await model.loadSubtreeFromScsFile(
 				rootNodeId,
-				`/parts/${part.fileName}`
+				`/preset_parts/${part.fileName}`
 			);
 
 			if (!nodeIds || nodeIds.length === 0) {

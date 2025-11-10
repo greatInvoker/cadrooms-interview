@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
-import type { Scene } from "../types";
+import type { Scene } from "../types/Scene";
 import { PartsList } from "./PartsList";
 import { SceneJsonViewer, type SceneJsonViewerHandle } from "./SceneJsonViewer";
 import { Button } from "@/components/ui/button";
@@ -30,10 +30,8 @@ import "../types/hoops.d.ts";
 import {
 	serializeScene,
 	deserializeScene,
-	getScenePartFiles,
 } from "@/lib/sceneSerializer";
 import type { SceneConfig } from "@/types/sceneConfig";
-import { uploadPartAssets } from "@/lib/assetUpload";
 
 interface SceneEditorProps {
 	sceneId: string;
@@ -52,6 +50,12 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const viewerRef = useRef<Communicator.WebViewer | null>(null);
 	const jsonViewerRef = useRef<SceneJsonViewerHandle>(null);
+
+	// Store part metadata for nodes
+	const nodePartMetadataRef = useRef<
+		Map<number, { cadUrl: string; isPreset: boolean }>
+	>(new Map());
+
 	const [scene, setScene] = useState<Scene | null>(null);
 	const [parts, setParts] = useState<Part[]>([]);
 	const [status, setStatus] = useState<string>("Initializing...");
@@ -94,15 +98,14 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 						id: "new",
 						name: "Untitled Scene",
 						description: "",
-						assets: [],
-						scene_json: null,
+							scene_json: null,
 						del_flag: 0,
 						created_at: new Date().toISOString(),
 						updated_at: new Date().toISOString(),
 					} as Scene);
 				}
 
-				const response = await fetch("/parts/parts_list.json");
+				const response = await fetch("/preset_parts/parts_list.json");
 				const partsData = await response.json();
 
 				const loadedParts: Part[] = partsData.parts.map(
@@ -112,7 +115,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 							.replace(/_/g, " ")
 							.replace(/\b\w/g, (l: string) => l.toUpperCase()),
 						fileName: `${part.name}.scs`,
-						thumbnail: `/parts/${part.name}.png`,
+						thumbnail: `/preset_parts/${part.name}.png`,
 					})
 				);
 
@@ -151,7 +154,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 	// Handle window resize with debounce
 	useEffect(() => {
-		let resizeTimeout: NodeJS.Timeout;
+		let resizeTimeout: ReturnType<typeof setTimeout>;
 
 		const handleResize = () => {
 			// Clear previous timeout
@@ -170,7 +173,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			}, 300);
 		};
 
-		window.addEventListener("resize", handleResize);
+		window.addEventListener("resize", handleResize, { passive: true });
 
 		return () => {
 			window.removeEventListener("resize", handleResize);
@@ -239,7 +242,13 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 								console.log(
 									`Loading ${config.parts.length} parts from database`
 								);
-								await deserializeScene(viewer, config);
+
+								// deserializeScene now returns node metadata mapping
+								const loadedMetadata = await deserializeScene(viewer, config);
+
+								// Update nodePartMetadataRef with the loaded metadata
+								nodePartMetadataRef.current = loadedMetadata;
+
 								setStatus(`Ready! ${config.parts.length} parts loaded`);
 							} else {
 								setStatus("Ready! Empty scene - drag parts to add");
@@ -298,13 +307,32 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 		}
 
 		try {
-			const partData = e.dataTransfer.getData("application/json");
-			if (!partData) {
-				console.error("No part data in drop event");
-				return;
+			// Try to get part with URLs first (from PartsListNew)
+			const partWithUrlsData = e.dataTransfer.getData("part-with-urls");
+			let cadUrl: string;
+			let isPreset = false;
+
+			if (partWithUrlsData) {
+				// New format with full URLs
+				const partWithUrls = JSON.parse(partWithUrlsData);
+				cadUrl = partWithUrls.cad_url;
+				isPreset = partWithUrls.is_system || false;
+				console.log(`Loading part from URL: ${cadUrl}, isPreset: ${isPreset}`);
+			} else {
+				// Fallback to legacy format
+				const partData = e.dataTransfer.getData("application/json");
+				if (!partData) {
+					console.error("No part data in drop event");
+					return;
+				}
+
+				const part: Part = JSON.parse(partData);
+				// Assume preset parts for legacy format
+				cadUrl = `/preset_parts/${part.fileName}`;
+				isPreset = true;
+				console.log(`Loading part (legacy): ${part.fileName}`);
 			}
 
-			const part: Part = JSON.parse(partData);
 			const viewer = viewerRef.current;
 
 			if (!viewer || !viewer.model) {
@@ -321,12 +349,12 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			const x = e.clientX - rect.left;
 			const y = e.clientY - rect.top;
 
-			console.log(`Loading part: ${part.fileName} at position (${x}, ${y})`);
+			console.log(`Loading part from: ${cadUrl}`);
 
-			// loadSubtreeFromScsFile 返回 Promise<NodeId[]>
+			// Load the part file using the URL
 			const nodeIds = await model.loadSubtreeFromScsFile(
 				rootNodeId,
-				`/parts/${part.fileName}`
+				cadUrl
 			);
 
 			if (!nodeIds || nodeIds.length === 0) {
@@ -336,6 +364,9 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 			const nodeId = nodeIds[0];
 			console.log(`Part loaded successfully, nodeId: ${nodeId}`);
+
+			// Store metadata for this node
+			nodePartMetadataRef.current.set(nodeId, { cadUrl, isPreset });
 
 			// 设置零件位置
 			const matrix = new window.Communicator.Matrix();
@@ -361,7 +392,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 				jsonViewerRef.current?.refresh();
 			}, 200);
 
-			console.log(`Part ${part.name} added successfully`);
+			console.log(`Part added successfully from: ${cadUrl}`);
 		} catch (err) {
 			console.error("Drop failed:", err);
 
@@ -433,15 +464,13 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			try {
 				if (viewerRef.current) {
 					// 序列化场景状态
-					const config = await serializeScene(viewerRef.current, sceneId);
-					const partFiles = getScenePartFiles(viewerRef.current);
+					const config = await serializeScene(viewerRef.current, sceneId, nodePartMetadataRef.current);
 
 					// 保存到数据库scene_json字段
 					const { error } = await supabase
 						.from("scenes")
 						.update({
 							scene_json: config,
-							assets: partFiles,
 							updated_at: new Date().toISOString(),
 						})
 						.eq("id", sceneId);
@@ -476,8 +505,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 					.insert({
 						name: formData.name,
 						description: formData.description,
-						assets: [],
-					})
+						})
 					.select()
 					.single();
 
@@ -488,36 +516,14 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 				// 获取场景中的零件列表
 				if (viewerRef.current) {
-					setStatus("Uploading part assets...");
+					const config = await serializeScene(viewerRef.current, newSceneId, nodePartMetadataRef.current);
 
-					const config = await serializeScene(viewerRef.current, newSceneId);
-
-					// 上传每个零件的图片和SCSS文件
-					const partNames = new Set<string>();
-					for (const part of config.parts) {
-						// 从文件名中提取零件名称（去掉.scs扩展名）
-						const partName = part.fileName.replace(/\.scs$/i, "");
-						partNames.add(partName);
-					}
-
-					// 并行上传所有零件的资产
-					const uploadPromises = Array.from(partNames).map((partName) =>
-						uploadPartAssets(newSceneId, partName).catch((err) => {
-							console.error(`Failed to upload assets for ${partName}:`, err);
-							return []; // 继续上传其他零件，即使某个失败
-						})
-					);
-
-					await Promise.all(uploadPromises);
-
-					// 更新scene_json和assets字段
-					const partFiles = getScenePartFiles(viewerRef.current);
-					await supabase
+					// 更新scene_json字段
+						await supabase
 						.from("scenes")
 						.update({
 							scene_json: config,
-							assets: partFiles,
-						})
+							})
 						.eq("id", newSceneId);
 				}
 
@@ -535,37 +541,16 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			} else {
 				// 更新已有场景
 				if (viewerRef.current) {
-					setStatus("Uploading part assets...");
-
-					const config = await serializeScene(viewerRef.current, sceneId);
-
-					// 上传每个零件的图片和SCSS文件
-					const partNames = new Set<string>();
-					for (const part of config.parts) {
-						const partName = part.fileName.replace(/\.scs$/i, "");
-						partNames.add(partName);
-					}
-
-					// 并行上传所有零件的资产
-					const uploadPromises = Array.from(partNames).map((partName) =>
-						uploadPartAssets(sceneId, partName).catch((err) => {
-							console.error(`Failed to upload assets for ${partName}:`, err);
-							return [];
-						})
-					);
-
-					await Promise.all(uploadPromises);
+					const config = await serializeScene(viewerRef.current, sceneId, nodePartMetadataRef.current);
 
 					// 更新数据库
-					const partFiles = getScenePartFiles(viewerRef.current);
-					const { error } = await supabase
+						const { error } = await supabase
 						.from("scenes")
 						.update({
 							name: formData.name,
 							description: formData.description,
 							scene_json: config,
-							assets: partFiles,
-							updated_at: new Date().toISOString(),
+								updated_at: new Date().toISOString(),
 						})
 						.eq("id", sceneId);
 
@@ -629,37 +614,16 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 		try {
 			setStatus("Saving scene...");
 
-			// 1. 序列化场景状态
-			const config = await serializeScene(viewerRef.current, sceneId);
+			// 序列化场景状态
+			const config = await serializeScene(viewerRef.current, sceneId, nodePartMetadataRef.current);
 
-			// 2. 获取零件文件列表
-			const partFiles = getScenePartFiles(viewerRef.current);
+			// 获取零件文件列表
 
-			// 3. 上传每个零件的图片和SCSS文件
-			setStatus("Uploading part assets...");
-
-			const partNames = new Set<string>();
-			for (const part of config.parts) {
-				const partName = part.fileName.replace(/\.scs$/i, "");
-				partNames.add(partName);
-			}
-
-			// 并行上传所有零件的资产
-			const uploadPromises = Array.from(partNames).map((partName) =>
-				uploadPartAssets(sceneId, partName).catch((err) => {
-					console.error(`Failed to upload assets for ${partName}:`, err);
-					return [];
-				})
-			);
-
-			await Promise.all(uploadPromises);
-
-			// 4. 更新数据库scene_json和assets字段
+			// 更新数据库scene_json字段
 			const { error } = await supabase
 				.from("scenes")
 				.update({
 					scene_json: config,
-					assets: partFiles,
 					updated_at: new Date().toISOString(),
 				})
 				.eq("id", sceneId);
@@ -667,7 +631,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			if (error) throw error;
 
 			setHasChanges(false);
-			setStatus(`Saved! ${config.parts.length} parts with assets uploaded`);
+			setStatus(`Saved! ${config.parts.length} parts`);
 
 			// 2秒后恢复状态
 			setTimeout(() => {
@@ -696,7 +660,13 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 		try {
 			setStatus("Loading scene from JSON...");
-			await deserializeScene(viewerRef.current, config);
+
+			// deserializeScene now returns node metadata mapping
+			const loadedMetadata = await deserializeScene(viewerRef.current, config);
+
+			// Update nodePartMetadataRef with the loaded metadata
+			nodePartMetadataRef.current = loadedMetadata;
+
 			setHasChanges(true);
 			setStatus(`Loaded! ${config.parts.length} parts from JSON`);
 
@@ -710,7 +680,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 	}
 
 	// Handle JSON viewer collapse/expand - resize 3D viewer
-	function handleJsonViewerCollapse(collapsed: boolean) {
+	function handleJsonViewerCollapse(_collapsed: boolean) {
 		// Give time for the DOM to update, then resize viewer
 		setTimeout(() => {
 			if (viewerRef.current) {
@@ -780,6 +750,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 						viewer={viewerRef.current}
 						onLoadJson={handleLoadJsonData}
 						onCollapse={handleJsonViewerCollapse}
+						nodeMetadata={nodePartMetadataRef.current}
 					/>
 				</div>
 

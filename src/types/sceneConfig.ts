@@ -21,6 +21,12 @@ export interface PartConfig {
 
   /** Visibility state of the part */
   visible: boolean;
+
+  /** Full URL to the CAD file (for user uploaded parts) */
+  cadUrl?: string;
+
+  /** Whether this is a system preset part */
+  isPreset?: boolean;
 }
 
 /**
