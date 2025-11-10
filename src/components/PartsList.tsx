@@ -62,10 +62,16 @@ export function PartsList({
 
 		try {
 			// Load preset parts from static files
-			await loadPresetParts();
+			const presetPartsLoaded = await loadPresetParts();
 
 			// Load user uploaded parts from database
-			await loadPartsFromDB();
+			const dbPartsLoaded = await loadPartsFromDB();
+
+			// Notify parent component with all parts (preset + db)
+			if (onPartsLoaded) {
+				const allParts = [...presetPartsLoaded, ...dbPartsLoaded];
+				onPartsLoaded(allParts);
+			}
 		} catch (err) {
 			const message = err instanceof Error ? err.message : "Failed to load parts";
 			setError(message);
@@ -102,9 +108,10 @@ export function PartsList({
 			}));
 
 			setPresetParts(parts);
+			return parts; // Return loaded parts
 		} catch (err) {
 			console.error("Failed to load preset parts:", err);
-			// Don't throw error, just log it
+			return []; // Return empty array on error
 		}
 	};
 
@@ -134,14 +141,10 @@ export function PartsList({
 			);
 
 			setDbParts(partsWithUrls);
-
-			// Notify parent component with all parts (preset + db)
-			if (onPartsLoaded) {
-				onPartsLoaded([...presetParts, ...partsWithUrls]);
-			}
+			return partsWithUrls; // Return loaded parts
 		} catch (err) {
 			console.error("Failed to load database parts:", err);
-			// Don't throw error, just log it
+			return []; // Return empty array on error
 		}
 	};
 

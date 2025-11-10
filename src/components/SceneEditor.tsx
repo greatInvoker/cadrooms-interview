@@ -58,6 +58,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 	const [scene, setScene] = useState<Scene | null>(null);
 	const [parts, setParts] = useState<Part[]>([]);
+	const [totalPartsCount, setTotalPartsCount] = useState<number>(0); // Total parts including user uploaded
 	const [status, setStatus] = useState<string>("Initializing...");
 	const [selectedNodeId, setSelectedNodeId] =
 		useState<Communicator.NodeId | null>(null);
@@ -737,6 +738,11 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 		}, 100);
 	}
 
+	// Handle parts loaded from PartsList component
+	const handlePartsLoaded = (allParts: any[]) => {
+		setTotalPartsCount(allParts.length);
+	};
+
 	return (
 		<div className="h-screen flex flex-col">
 			{/* Header */}
@@ -800,14 +806,14 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 				{/* Right: Parts List */}
 				<div className="w-80 shrink-0 border-l">
-					<PartsList parts={parts} />
+					<PartsList parts={parts} onPartsLoaded={handlePartsLoaded} />
 				</div>
 			</div>
 
 			{/* Footer */}
 			<div className="px-6 py-3 border-t bg-muted/30 flex items-center justify-between">
 				<span className="text-xs text-muted-foreground">
-					{parts.length} parts available | Drag to add, click to select
+					{totalPartsCount > 0 ? totalPartsCount : parts.length} parts available | Drag parts to add • Select and click delete to remove
 				</span>
 				<div className="flex items-center gap-3">
 					{selectedNodeId && (
