@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { Scene } from "../types";
 import { PartsList } from "./PartsList";
+import { SceneJsonViewer, type SceneJsonViewerHandle } from "./SceneJsonViewer";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -31,7 +32,7 @@ import {
 	deserializeScene,
 	getScenePartFiles,
 } from "@/lib/sceneSerializer";
-import { saveSceneConfig, loadSceneConfig } from "@/lib/sceneStorage";
+import type { SceneConfig } from "@/types/sceneConfig";
 import { uploadPartAssets } from "@/lib/assetUpload";
 
 interface SceneEditorProps {
@@ -50,6 +51,7 @@ interface Part {
 export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const viewerRef = useRef<Communicator.WebViewer | null>(null);
+	const jsonViewerRef = useRef<SceneJsonViewerHandle>(null);
 	const [scene, setScene] = useState<Scene | null>(null);
 	const [parts, setParts] = useState<Part[]>([]);
 	const [status, setStatus] = useState<string>("Initializing...");
@@ -77,10 +79,11 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 						.from("scenes")
 						.select("*")
 						.eq("id", sceneId)
+						.eq("del_flag", 0) // Only load active scenes
 						.single();
 
 					if (fetchError) throw fetchError;
-					if (!data) throw new Error("Scene not found");
+					if (!data) throw new Error("Scene not found or deleted");
 
 					if (!mounted) return;
 					setScene(data);
@@ -92,6 +95,8 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 						name: "Untitled Scene",
 						description: "",
 						assets: [],
+						scene_json: null,
+						del_flag: 0,
 						created_at: new Date().toISOString(),
 						updated_at: new Date().toISOString(),
 					} as Scene);
@@ -144,6 +149,35 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 		};
 	}, [sceneId, isNewScene]);
 
+	// Handle window resize with debounce
+	useEffect(() => {
+		let resizeTimeout: NodeJS.Timeout;
+
+		const handleResize = () => {
+			// Clear previous timeout
+			clearTimeout(resizeTimeout);
+
+			// Debounce: wait 300ms after last resize event
+			resizeTimeout = setTimeout(() => {
+				if (viewerRef.current) {
+					try {
+						console.log("Resizing viewer canvas");
+						viewerRef.current.resizeCanvas();
+					} catch (err) {
+						console.error("Failed to resize canvas:", err);
+					}
+				}
+			}, 300);
+		};
+
+		window.addEventListener("resize", handleResize);
+
+		return () => {
+			window.removeEventListener("resize", handleResize);
+			clearTimeout(resizeTimeout);
+		};
+	}, []);
+
 	async function initViewer() {
 		return new Promise<void>((resolve, reject) => {
 			if (!containerRef.current) {
@@ -189,11 +223,21 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 					if (!isNewScene) {
 						try {
 							setStatus("Loading saved scene...");
-							const config = await loadSceneConfig(sceneId);
 
-							if (config && config.parts.length > 0) {
+							// Load scene_json from database
+							const { data: sceneData, error: loadError } = await supabase
+								.from("scenes")
+								.select("scene_json")
+								.eq("id", sceneId)
+								.single();
+
+							if (loadError) throw loadError;
+
+							const config = sceneData?.scene_json as SceneConfig | null;
+
+							if (config && config.parts && config.parts.length > 0) {
 								console.log(
-									`Loading ${config.parts.length} parts from saved config`
+									`Loading ${config.parts.length} parts from database`
 								);
 								await deserializeScene(viewer, config);
 								setStatus(`Ready! ${config.parts.length} parts loaded`);
@@ -207,6 +251,11 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 					} else {
 						setStatus("Ready! New scene - drag parts to add");
 					}
+
+					// Refresh JSON viewer now that scene is fully ready
+					setTimeout(() => {
+						jsonViewerRef.current?.refresh();
+					}, 100);
 
 					resolve();
 				},
@@ -226,11 +275,16 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 				},
 			});
 
-			viewer.start().catch((err) => {
-				console.error("Viewer start failed:", err);
-				setStatus(`Failed to start editor: ${err.message}`);
-				reject(err);
-			});
+			const startResult = viewer.start();
+
+			// Handle both Promise and void return types
+			if (startResult && typeof startResult.catch === "function") {
+				startResult.catch((err) => {
+					console.error("Viewer start failed:", err);
+					setStatus(`Failed to start editor: ${err.message}`);
+					reject(err);
+				});
+			}
 		});
 	}
 
@@ -252,6 +306,12 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 			const part: Part = JSON.parse(partData);
 			const viewer = viewerRef.current;
+
+			if (!viewer || !viewer.model) {
+				console.error("Viewer not ready");
+				return;
+			}
+
 			const model = viewer.model;
 			const rootNodeId = model.getRootNode();
 
@@ -296,14 +356,24 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			// 标记场景有修改
 			setHasChanges(true);
 
+			// 触发JSON viewer更新
+			setTimeout(() => {
+				jsonViewerRef.current?.refresh();
+			}, 200);
+
 			console.log(`Part ${part.name} added successfully`);
 		} catch (err) {
 			console.error("Drop failed:", err);
-			alert(
-				`Failed to load part: ${
-					err instanceof Error ? err.message : "Unknown error"
-				}`
-			);
+
+			// Provide user-friendly error messages
+			let errorMessage = "Unknown error";
+			if (err instanceof SyntaxError) {
+				errorMessage = "Invalid part data format";
+			} else if (err instanceof Error) {
+				errorMessage = err.message;
+			}
+
+			alert(`Failed to load part: ${errorMessage}`);
 		}
 	}
 
@@ -322,6 +392,11 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			model.deleteNode(selectedNodeId);
 			setSelectedNodeId(null);
 			setHasChanges(true); // 标记有修改
+
+			// 触发JSON viewer更新
+			setTimeout(() => {
+				jsonViewerRef.current?.refresh();
+			}, 100);
 		} catch (err) {
 			console.error("Delete failed:", err);
 		}
@@ -357,15 +432,15 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			// 已有场景，直接保存并退出
 			try {
 				if (viewerRef.current) {
-					// 序列化并保存场景状态
+					// 序列化场景状态
 					const config = await serializeScene(viewerRef.current, sceneId);
-					await saveSceneConfig(sceneId, config);
-
 					const partFiles = getScenePartFiles(viewerRef.current);
 
+					// 保存到数据库scene_json字段
 					const { error } = await supabase
 						.from("scenes")
 						.update({
+							scene_json: config,
 							assets: partFiles,
 							updated_at: new Date().toISOString(),
 						})
@@ -416,7 +491,6 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 					setStatus("Uploading part assets...");
 
 					const config = await serializeScene(viewerRef.current, newSceneId);
-					await saveSceneConfig(newSceneId, config);
 
 					// 上传每个零件的图片和SCSS文件
 					const partNames = new Set<string>();
@@ -436,11 +510,14 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 					await Promise.all(uploadPromises);
 
-					// 更新assets字段
+					// 更新scene_json和assets字段
 					const partFiles = getScenePartFiles(viewerRef.current);
 					await supabase
 						.from("scenes")
-						.update({ assets: partFiles })
+						.update({
+							scene_json: config,
+							assets: partFiles,
+						})
 						.eq("id", newSceneId);
 				}
 
@@ -461,7 +538,6 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 					setStatus("Uploading part assets...");
 
 					const config = await serializeScene(viewerRef.current, sceneId);
-					await saveSceneConfig(sceneId, config);
 
 					// 上传每个零件的图片和SCSS文件
 					const partNames = new Set<string>();
@@ -487,6 +563,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 						.update({
 							name: formData.name,
 							description: formData.description,
+							scene_json: config,
 							assets: partFiles,
 							updated_at: new Date().toISOString(),
 						})
@@ -555,13 +632,10 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			// 1. 序列化场景状态
 			const config = await serializeScene(viewerRef.current, sceneId);
 
-			// 2. 保存到Storage
-			await saveSceneConfig(sceneId, config);
-
-			// 3. 获取零件文件列表
+			// 2. 获取零件文件列表
 			const partFiles = getScenePartFiles(viewerRef.current);
 
-			// 4. 上传每个零件的图片和SCSS文件
+			// 3. 上传每个零件的图片和SCSS文件
 			setStatus("Uploading part assets...");
 
 			const partNames = new Set<string>();
@@ -580,10 +654,11 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 			await Promise.all(uploadPromises);
 
-			// 5. 更新数据库
+			// 4. 更新数据库scene_json和assets字段
 			const { error } = await supabase
 				.from("scenes")
 				.update({
+					scene_json: config,
 					assets: partFiles,
 					updated_at: new Date().toISOString(),
 				})
@@ -610,6 +685,42 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 				}`
 			);
 		}
+	}
+
+	// Handle loading JSON data into the viewer
+	async function handleLoadJsonData(config: SceneConfig) {
+		if (!viewerRef.current) {
+			console.error("Viewer not ready");
+			return;
+		}
+
+		try {
+			setStatus("Loading scene from JSON...");
+			await deserializeScene(viewerRef.current, config);
+			setHasChanges(true);
+			setStatus(`Loaded! ${config.parts.length} parts from JSON`);
+
+			setTimeout(() => {
+				setStatus("Ready! Edit mode active");
+			}, 2000);
+		} catch (err) {
+			console.error("Failed to load JSON:", err);
+			setStatus("Load failed!");
+		}
+	}
+
+	// Handle JSON viewer collapse/expand - resize 3D viewer
+	function handleJsonViewerCollapse(collapsed: boolean) {
+		// Give time for the DOM to update, then resize viewer
+		setTimeout(() => {
+			if (viewerRef.current) {
+				try {
+					viewerRef.current.resizeCanvas();
+				} catch (err) {
+					console.error("Failed to resize viewer:", err);
+				}
+			}
+		}, 100);
 	}
 
 	return (
@@ -651,39 +762,51 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 				</div>
 			</div>
 
-			{/* Toolbar */}
-			<div className="px-6 py-3 border-b bg-muted/30 flex gap-2 items-center">
-				<Button
-					onClick={handleDelete}
-					disabled={!selectedNodeId}
-					variant="destructive"
-					size="sm">
-					<Trash2 className="mr-2 h-4 w-4" />
-					Delete Selected
-				</Button>
-				<span className="text-xs text-muted-foreground ml-auto">
-					{selectedNodeId ? `Selected: Node ${selectedNodeId}` : "No selection"}
-				</span>
-			</div>
-
 			{/* Main Content */}
 			<div className="flex-1 flex overflow-hidden">
-				<div
-					ref={containerRef}
-					onDrop={handleDrop}
-					onDragOver={handleDragOver}
-					className="flex-1 relative bg-background"
-				/>
+				{/* Left: 3D Viewer + JSON Viewer */}
+				<div className="flex-1 flex flex-col overflow-hidden">
+					{/* 3D Viewer */}
+					<div
+						ref={containerRef}
+						onDrop={handleDrop}
+						onDragOver={handleDragOver}
+						className="flex-1 relative bg-background"
+					/>
 
+					{/* Scene JSON Viewer */}
+					<SceneJsonViewer
+						ref={jsonViewerRef}
+						viewer={viewerRef.current}
+						onLoadJson={handleLoadJsonData}
+						onCollapse={handleJsonViewerCollapse}
+					/>
+				</div>
+
+				{/* Right: Parts List */}
 				<div className="w-80 shrink-0 border-l">
 					<PartsList parts={parts} />
 				</div>
 			</div>
 
 			{/* Footer */}
-			<div className="px-6 py-3 border-t bg-muted/30 text-xs text-muted-foreground">
-				{parts.length} parts available | Drag to add, click to select, delete to
-				remove
+			<div className="px-6 py-3 border-t bg-muted/30 flex items-center justify-between">
+				<span className="text-xs text-muted-foreground">
+					{parts.length} parts available | Drag to add, click to select
+				</span>
+				<div className="flex items-center gap-3">
+					{selectedNodeId && (
+						<>
+							<span className="text-xs text-muted-foreground">
+								Selected: Node {selectedNodeId}
+							</span>
+							<Button onClick={handleDelete} variant="destructive" size="sm">
+								<Trash2 className="mr-2 h-3 w-3" />
+								Delete
+							</Button>
+						</>
+					)}
+				</div>
 			</div>
 
 			{/* Save Dialog */}

@@ -13,6 +13,11 @@ export async function serializeScene(
 	sceneId: string
 ): Promise<SceneConfig> {
 	const model = viewer.model;
+
+	if (!model) {
+		throw new Error("Viewer model not initialized");
+	}
+
 	const rootNodeId = model.getRootNode();
 	const children = model.getNodeChildren(rootNodeId);
 
@@ -33,6 +38,9 @@ export async function serializeScene(
 			// Get transformation matrix
 			const matrix = model.getNodeMatrix(nodeId);
 
+			// Get visibility state
+			const visible = model.getNodeVisibility(nodeId);
+
 			// Extract file name from node name
 			const fileName = extractFileName(nodeName);
 
@@ -44,6 +52,7 @@ export async function serializeScene(
 				name: nodeName,
 				fileName,
 				matrix: matrixArray,
+				visible,
 			});
 
 			console.log(`Serialized part: ${fileName} (nodeId: ${nodeId})`);
@@ -77,6 +86,11 @@ export async function deserializeScene(
 	config: SceneConfig
 ): Promise<void> {
 	const model = viewer.model;
+
+	if (!model) {
+		throw new Error("Viewer model not initialized");
+	}
+
 	const rootNodeId = model.getRootNode();
 
 	console.log(`Deserializing scene: ${config.parts.length} parts to load`);
@@ -108,8 +122,8 @@ export async function deserializeScene(
 
 			model.setNodeMatrix(nodeId, matrix);
 
-			// Ensure part is visible
-			model.setNodesVisibility([nodeId], true);
+			// Restore visibility state
+			model.setNodesVisibility([nodeId], part.visible);
 
 			console.log(`Part loaded and positioned: ${part.fileName} (nodeId: ${nodeId})`);
 		} catch (err) {
@@ -158,8 +172,11 @@ function extractFileName(nodeName: string): string {
 export function getScenePartFiles(viewer: Communicator.WebViewer): string[] {
 
 	const model = viewer.model;
-	console.log('测试数据>>>');
-	console.dir(viewer);
+
+	if (!model) {
+		console.error("Viewer model not initialized");
+		return [];
+	}
 
 	const rootNodeId = model.getRootNode();
 	const children = model.getNodeChildren(rootNodeId);

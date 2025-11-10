@@ -3,8 +3,7 @@ import { supabase } from "../lib/supabase";
 import type { Scene } from "../types";
 import { PartsList } from "./PartsList";
 import "../types/hoops.d.ts";
-import { deserializeScene } from "@/lib/sceneSerializer";
-import { loadSceneConfig } from "@/lib/sceneStorage";
+import { deserializeScene, type SceneConfig } from "@/lib/sceneSerializer";
 
 interface SceneViewerProps {
 	sceneId: string;
@@ -36,10 +35,11 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 					.from("scenes")
 					.select("*")
 					.eq("id", sceneId)
+					.eq("del_flag", 0) // Only load active scenes
 					.single();
 
 				if (fetchError) throw fetchError;
-				if (!data) throw new Error("Scene not found");
+				if (!data) throw new Error("Scene not found or deleted");
 
 				if (!mounted) return;
 				setScene(data);
@@ -91,6 +91,35 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 		};
 	}, [sceneId]);
 
+	// Handle window resize with debounce
+	useEffect(() => {
+		let resizeTimeout: NodeJS.Timeout;
+
+		const handleResize = () => {
+			// Clear previous timeout
+			clearTimeout(resizeTimeout);
+
+			// Debounce: wait 300ms after last resize event
+			resizeTimeout = setTimeout(() => {
+				if (viewerRef.current) {
+					try {
+						console.log("Resizing viewer canvas");
+						viewerRef.current.resizeCanvas();
+					} catch (err) {
+						console.error("Failed to resize canvas:", err);
+					}
+				}
+			}, 300);
+		};
+
+		window.addEventListener("resize", handleResize);
+
+		return () => {
+			window.removeEventListener("resize", handleResize);
+			clearTimeout(resizeTimeout);
+		};
+	}, []);
+
 	async function initViewer() {
 		return new Promise<void>((resolve, reject) => {
 			if (!containerRef.current) {
@@ -131,14 +160,24 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 						window.Communicator.OverlayAnchor.LowerLeftCorner
 					);
 
-					// Load saved scene state
+					// Load saved scene state from database
 					try {
 						setStatus("Loading scene...");
-						const config = await loadSceneConfig(sceneId);
 
-						if (config && config.parts.length > 0) {
+						// Load scene_json from database
+						const { data: sceneData, error: loadError } = await supabase
+							.from("scenes")
+							.select("scene_json")
+							.eq("id", sceneId)
+							.single();
+
+						if (loadError) throw loadError;
+
+						const config = sceneData?.scene_json as SceneConfig | null;
+
+						if (config && config.parts && config.parts.length > 0) {
 							console.log(
-								`Loading ${config.parts.length} parts from saved config`
+								`Loading ${config.parts.length} parts from database`
 							);
 							await deserializeScene(viewer, config);
 							setStatus(`${config.parts.length} parts loaded`);
@@ -157,11 +196,16 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 				},
 			});
 
-			viewer.start().catch((err) => {
-				console.error("Viewer start failed:", err);
-				setStatus(`Failed to start viewer: ${err.message}`);
-				reject(err);
-			});
+			const startResult = viewer.start();
+
+			// Handle both Promise and void return types
+			if (startResult && typeof startResult.catch === "function") {
+				startResult.catch((err) => {
+					console.error("Viewer start failed:", err);
+					setStatus(`Failed to start viewer: ${err.message}`);
+					reject(err);
+				});
+			}
 		});
 	}
 
@@ -183,6 +227,12 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 
 			const part: Part = JSON.parse(partData);
 			const viewer = viewerRef.current;
+
+			if (!viewer || !viewer.model) {
+				console.error("Viewer not ready");
+				return;
+			}
+
 			const model = viewer.model;
 			const rootNodeId = model.getRootNode();
 
@@ -227,11 +277,16 @@ export function SceneViewer({ sceneId, onClose }: SceneViewerProps) {
 			console.log(`Part ${part.name} added successfully`);
 		} catch (err) {
 			console.error("Drop failed:", err);
-			alert(
-				`Failed to load part: ${
-					err instanceof Error ? err.message : "Unknown error"
-				}`
-			);
+
+			// Provide user-friendly error messages
+			let errorMessage = "Unknown error";
+			if (err instanceof SyntaxError) {
+				errorMessage = "Invalid part data format";
+			} else if (err instanceof Error) {
+				errorMessage = err.message;
+			}
+
+			alert(`Failed to load part: ${errorMessage}`);
 		}
 	}
 
