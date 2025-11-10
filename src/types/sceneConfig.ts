@@ -18,6 +18,9 @@ export interface PartConfig {
 
   /** Display name of the part */
   name: string;
+
+  /** Visibility state of the part */
+  visible: boolean;
 }
 
 /**

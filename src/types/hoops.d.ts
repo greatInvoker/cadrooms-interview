@@ -12,8 +12,9 @@ declare global {
       selectionManager: SelectionManager;
       operatorManager: OperatorManager;
       // Scene management
-      start(): Promise<void>;
+      start(): void | Promise<void>;
       shutdown(): Promise<void>;
+      resizeCanvas(): void;
       getModel(): Model;
       getView(): View;
       getSelectionManager(): SelectionManager;
@@ -50,6 +51,7 @@ declare global {
       getNodeMatrix(nodeId: NodeId): Matrix;
       setNodeMatrix(nodeId: NodeId, matrix: Matrix): void;
       getNodeChildren(nodeId: NodeId): NodeId[];
+      getNodeVisibility(nodeId: NodeId): boolean;
       getRootNode(): NodeId;
       deleteNode(nodeId: NodeId): void;
       loadSubtreeFromScsFile(
