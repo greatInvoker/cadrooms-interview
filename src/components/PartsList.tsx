@@ -4,12 +4,22 @@
  */
 
 import { useState, useEffect } from "react";
-import { listParts, getPartWithUrls } from "@/lib/partsManager";
+import { listParts, getPartWithUrls, deletePart } from "@/lib/partsManager";
 import type { PartWithUrls } from "@/types/parts";
 import { PartUploadDialog } from "./PartUploadDialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Loader2, Package } from "lucide-react";
+import { Upload, Loader2, Package, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Legacy Part interface for drag-drop compatibility
 interface LegacyPart {
@@ -35,6 +45,11 @@ export function PartsList({
 	const [loading, setLoading] = useState(true);
 	const [showUploadDialog, setShowUploadDialog] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	// Delete confirmation dialog state
+	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+	const [partToDelete, setPartToDelete] = useState<PartWithUrls | null>(null);
+	const [deleting, setDeleting] = useState(false);
 
 	// Load parts from database and preset parts on mount
 	useEffect(() => {
@@ -163,6 +178,48 @@ export function PartsList({
 		}
 	};
 
+	// Handle delete button click
+	const handleDeleteClick = (e: React.MouseEvent, part: PartWithUrls) => {
+		e.stopPropagation(); // Prevent drag start
+		setPartToDelete(part);
+		setShowDeleteDialog(true);
+	};
+
+	// Confirm and execute delete
+	const handleConfirmDelete = async () => {
+		if (!partToDelete) return;
+
+		setDeleting(true);
+		try {
+			await deletePart(partToDelete.id);
+
+			toast.success("Part deleted successfully", {
+				description: `${partToDelete.name} has been removed from your library`,
+			});
+
+			// Refresh parts list
+			await loadAllParts();
+
+			// Close dialog
+			setShowDeleteDialog(false);
+			setPartToDelete(null);
+		} catch (err) {
+			console.error("Failed to delete part:", err);
+			const message = err instanceof Error ? err.message : "Unknown error";
+			toast.error("Failed to delete part", {
+				description: message,
+			});
+		} finally {
+			setDeleting(false);
+		}
+	};
+
+	// Cancel delete
+	const handleCancelDelete = () => {
+		setShowDeleteDialog(false);
+		setPartToDelete(null);
+	};
+
 	// Merge preset parts and DB parts for display
 	const allParts = [...presetParts, ...dbParts];
 
@@ -288,6 +345,7 @@ export function PartsList({
 									backgroundColor: "#fff",
 									cursor: "grab",
 									transition: "all 0.2s",
+									position: "relative",
 								}}
 								onMouseEnter={(e) => {
 									e.currentTarget.style.backgroundColor = "#f8f9fa";
@@ -386,14 +444,45 @@ export function PartsList({
 										)}
 									</div>
 
-									{/* Drag Handle */}
-									<div
-										style={{
-											fontSize: "18px",
-											color: "#999",
-										}}
-									>
-										⋮⋮
+									{/* Actions */}
+									<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+										{/* Delete button - only for user uploaded parts */}
+										{!part.is_system && (
+											<button
+												onClick={(e) => handleDeleteClick(e, part)}
+												style={{
+													background: "none",
+													border: "none",
+													cursor: "pointer",
+													padding: "4px",
+													display: "flex",
+													alignItems: "center",
+													justifyContent: "center",
+													color: "#dc2626",
+													borderRadius: "4px",
+													transition: "background-color 0.2s",
+												}}
+												onMouseEnter={(e) => {
+													e.currentTarget.style.backgroundColor = "#fee2e2";
+												}}
+												onMouseLeave={(e) => {
+													e.currentTarget.style.backgroundColor = "transparent";
+												}}
+												title="Delete part"
+											>
+												<Trash2 className="w-4 h-4" />
+											</button>
+										)}
+
+										{/* Drag Handle */}
+										<div
+											style={{
+												fontSize: "18px",
+												color: "#999",
+											}}
+										>
+											⋮⋮
+										</div>
 									</div>
 								</div>
 							</div>
@@ -408,6 +497,40 @@ export function PartsList({
 				onClose={() => setShowUploadDialog(false)}
 				onSuccess={handleUploadSuccess}
 			/>
+
+			{/* Delete Confirmation Dialog */}
+			<AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete Part</AlertDialogTitle>
+						<AlertDialogDescription>
+							Are you sure you want to delete <strong>{partToDelete?.name}</strong>?
+							<br />
+							<br />
+							This action cannot be undone. The part will be removed from your library.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel onClick={handleCancelDelete} disabled={deleting}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={handleConfirmDelete}
+							disabled={deleting}
+							className="bg-red-600 hover:bg-red-700"
+						>
+							{deleting ? (
+								<>
+									<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+									Deleting...
+								</>
+							) : (
+								"Delete"
+							)}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }
