@@ -76,6 +76,11 @@
     animation: accordion-up 0.2s ease-out;
   }
 
+  /* 场景卡片高光渐变动画 */
+  .animate-highlight-fade {
+    animation: highlight-fade 3s ease-out;
+  }
+
   /* 对话框层级工具类 */
   .z-overlay {
     z-index: 50;
@@ -93,4 +98,19 @@
 @keyframes accordion-up {
   from { height: var(--radix-accordion-content-height); }
   to { height: 0; }
+}
+
+@keyframes highlight-fade {
+  0% {
+    background-color: hsl(var(--color-card));
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+  10% {
+    background-color: hsl(142.1 76.2% 91%);
+    box-shadow: 0 0 0 2px hsl(142.1 76.2% 65%), 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  }
+  100% {
+    background-color: hsl(var(--color-card));
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
 }

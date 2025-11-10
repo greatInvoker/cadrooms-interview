@@ -42,6 +42,7 @@ export function ScenesList() {
 	const [formData, setFormData] = useState({ name: "", description: "" });
 	const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
 	const [deletingScene, setDeletingScene] = useState<Scene | null>(null);
+	const [highlightedSceneId, setHighlightedSceneId] = useState<string | null>(null);
 
 	async function loadScenes() {
 		try {
@@ -122,18 +123,53 @@ export function ScenesList() {
 		loadScenes();
 	}, []);
 
+	// Auto-remove highlight after 3 seconds
+	useEffect(() => {
+		if (highlightedSceneId) {
+			const timer = setTimeout(() => {
+				setHighlightedSceneId(null);
+			}, 3000);
+
+			return () => clearTimeout(timer);
+		}
+	}, [highlightedSceneId]);
+
 	// Show editor if editing a scene
 	if (editingSceneId) {
 		return (
 			<SceneEditor
 				sceneId={editingSceneId}
 				onClose={() => {
+					const wasEditing = editingSceneId !== "new";
+					const sceneIdToHighlight = wasEditing ? editingSceneId : null;
 					setEditingSceneId(null);
-					loadScenes();
+					loadScenes().then(() => {
+						if (sceneIdToHighlight) {
+							setHighlightedSceneId(sceneIdToHighlight);
+						}
+					});
 				}}
 				onSave={() => {
+					const wasEditing = editingSceneId !== "new";
 					setEditingSceneId(null);
-					loadScenes();
+					loadScenes().then(() => {
+						if (wasEditing) {
+							// For existing scenes, highlight the edited scene
+							setHighlightedSceneId(editingSceneId);
+						} else {
+							// For new scenes, highlight the first scene in the refreshed list
+							// (it will be at the top due to updated_at sorting)
+							setTimeout(() => {
+								const firstScene = document.querySelector('[data-scene-card]');
+								if (firstScene) {
+									const sceneId = firstScene.getAttribute('data-scene-id');
+									if (sceneId) {
+										setHighlightedSceneId(sceneId);
+									}
+								}
+							}, 100);
+						}
+					});
 				}}
 			/>
 		);
@@ -189,7 +225,16 @@ export function ScenesList() {
 			) : (
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 					{scenes.map((scene) => (
-						<Card key={scene.id} className="hover:shadow-lg transition-shadow">
+						<Card
+							key={scene.id}
+							data-scene-card
+							data-scene-id={scene.id}
+							className={`hover:shadow-lg transition-all duration-300 ${
+								highlightedSceneId === scene.id
+									? 'animate-highlight-fade'
+									: ''
+							}`}
+						>
 							<CardHeader className="relative">
 								<Button
 									variant="ghost"
