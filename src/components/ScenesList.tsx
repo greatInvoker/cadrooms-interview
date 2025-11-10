@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, FolderOpen, Trash2, Pencil } from "lucide-react";
+import { SplineScene } from "@/components/ui/spline-scene";
 
 export function ScenesList() {
 	const [scenes, setScenes] = useState<Scene[]>([]);
@@ -42,7 +43,9 @@ export function ScenesList() {
 	const [formData, setFormData] = useState({ name: "", description: "" });
 	const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
 	const [deletingScene, setDeletingScene] = useState<Scene | null>(null);
-	const [highlightedSceneId, setHighlightedSceneId] = useState<string | null>(null);
+	const [highlightedSceneId, setHighlightedSceneId] = useState<string | null>(
+		null
+	);
 
 	async function loadScenes() {
 		try {
@@ -160,9 +163,9 @@ export function ScenesList() {
 							// For new scenes, highlight the first scene in the refreshed list
 							// (it will be at the top due to updated_at sorting)
 							setTimeout(() => {
-								const firstScene = document.querySelector('[data-scene-card]');
+								const firstScene = document.querySelector("[data-scene-card]");
 								if (firstScene) {
-									const sceneId = firstScene.getAttribute('data-scene-id');
+									const sceneId = firstScene.getAttribute("data-scene-id");
 									if (sceneId) {
 										setHighlightedSceneId(sceneId);
 									}
@@ -194,19 +197,30 @@ export function ScenesList() {
 
 	return (
 		<div className="container mx-auto py-8 px-4 max-w-6xl">
-			<div className="flex justify-between items-center mb-8">
+			<div className="relative flex justify-between items-center min-h-[200px]">
+				<h2 className="absolute left-0 top-0 text-3xl font-bold tracking-tight">
+					CAD ROOMS
+				</h2>
 				<div>
-					<h1 className="text-4xl font-bold tracking-tight">Scenes</h1>
+					<h2 className="text-3xl tracking-tight">Scenes</h2>
 					<p className="text-muted-foreground mt-2">
 						Manage your 3D scenes and assemblies
 					</p>
 				</div>
-				<Button onClick={startCreateNewScene} size="lg">
+				<div className="absolute inset-0">
+					<SplineScene
+						scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+						className="w-full h-full"
+					/>
+				</div>
+				<Button
+					onClick={startCreateNewScene}
+					size="lg"
+					className="relative z-10">
 					<Plus className="mr-2 h-4 w-4" />
 					Create Scene
 				</Button>
 			</div>
-
 			{scenes.length === 0 ? (
 				<Card className="text-center py-12">
 					<CardHeader>
@@ -230,11 +244,8 @@ export function ScenesList() {
 							data-scene-card
 							data-scene-id={scene.id}
 							className={`hover:shadow-lg transition-all duration-300 ${
-								highlightedSceneId === scene.id
-									? 'animate-highlight-fade'
-									: ''
-							}`}
-						>
+								highlightedSceneId === scene.id ? "animate-highlight-fade" : ""
+							}`}>
 							<CardHeader className="relative">
 								<Button
 									variant="ghost"
@@ -288,9 +299,7 @@ export function ScenesList() {
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>Edit Scene</DialogTitle>
-						<DialogDescription>
-							Update the scene information
-						</DialogDescription>
+						<DialogDescription>Update the scene information</DialogDescription>
 					</DialogHeader>
 					<div className="space-y-4 py-4">
 						<div className="space-y-2">
