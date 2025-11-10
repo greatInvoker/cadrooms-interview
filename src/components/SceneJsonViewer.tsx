@@ -79,18 +79,6 @@ export const SceneJsonViewer = forwardRef<
 				return;
 			}
 
-			// Try to access root node - this will fail if model is not fully initialized
-			let rootNodeId: number;
-			try {
-				rootNodeId = model.getRootNode();
-			} catch (err) {
-				console.warn("Viewer model not fully initialized yet");
-				setJsonText("");
-				return;
-			}
-
-			const children = model.getNodeChildren(rootNodeId);
-
 			// Preset parts list for fallback identification
 			const presetParts = new Set([
 				"axe",
@@ -109,43 +97,47 @@ export const SceneJsonViewer = forwardRef<
 				isPreset?: boolean;
 			}> = [];
 
-			children.forEach((nodeId) => {
-				try {
-					const nodeName = model.getNodeName(nodeId);
-					const matrix = model.getNodeMatrix(nodeId);
-					const visible = model.getNodeVisibility(nodeId);
+			// Use nodeMetadata as the source of truth for which nodes are parts
+			// This way we only serialize nodes that were actually added as parts
+			if (nodeMetadata && nodeMetadata.size > 0) {
+				nodeMetadata.forEach((metadata, nodeId) => {
+					try {
+						// Try to get node information - if the node was deleted, this will fail
+						const nodeName = model.getNodeName(nodeId);
+						const matrix = model.getNodeMatrix(nodeId);
+						const visible = model.getNodeVisibility(nodeId);
 
-					// Get metadata for this node if available
-					const metadata = nodeMetadata?.get(nodeId);
-					const fileName = nodeName || `part_${nodeId}.scs`;
-					const partBaseName = fileName.replace(/\.scs$/i, "");
+						const fileName = nodeName || `part_${nodeId}.scs`;
+						const partBaseName = fileName.replace(/\.scs$/i, "");
 
-					const partData: any = {
-						fileName,
-						nodeId,
-						matrix: matrix.m,
-						name: nodeName || `part_${nodeId}`,
-						visible,
-					};
+						const partData: any = {
+							fileName,
+							nodeId,
+							matrix: matrix.m,
+							name: nodeName || `part_${nodeId}`,
+							visible,
+						};
 
-					// Add cadUrl if available
-					if (metadata?.cadUrl) {
-						partData.cadUrl = metadata.cadUrl;
+						// Add cadUrl if available
+						if (metadata?.cadUrl) {
+							partData.cadUrl = metadata.cadUrl;
+						}
+
+						// Add isPreset flag
+						if (metadata?.isPreset !== undefined) {
+							partData.isPreset = metadata.isPreset;
+						} else {
+							// Fallback: check if it's a preset part by name
+							partData.isPreset = presetParts.has(partBaseName);
+						}
+
+						parts.push(partData);
+					} catch (err) {
+						// Node was deleted or doesn't exist anymore - skip it
+						// Silent skip - no need to log for normal delete operations
 					}
-
-					// Add isPreset flag
-					if (metadata?.isPreset !== undefined) {
-						partData.isPreset = metadata.isPreset;
-					} else {
-						// Fallback: check if it's a preset part by name
-						partData.isPreset = presetParts.has(partBaseName);
-					}
-
-					parts.push(partData);
-				} catch (err) {
-					console.error(`Failed to get data for node ${nodeId}:`, err);
-				}
-			});
+				});
+			}
 
 			const config: SceneConfig = {
 				version: "1.0",

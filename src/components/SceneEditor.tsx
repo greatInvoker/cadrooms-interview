@@ -413,21 +413,65 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 		e.dataTransfer.dropEffect = "copy";
 	};
 
-	function handleDelete() {
+	async function handleDelete() {
 		if (!selectedNodeId || !viewerRef.current) {
 			return;
 		}
 
 		try {
 			const model = viewerRef.current.model;
-			model.deleteNode(selectedNodeId);
-			setSelectedNodeId(null);
-			setHasChanges(true); // 标记有修改
 
-			// 触发JSON viewer更新
+			// Find the part root node by traversing up the node tree
+			// The part root node is the one that's in our metadata map
+			let partRootNodeId = selectedNodeId;
+			let currentNodeId = selectedNodeId;
+
+			// Traverse up the node hierarchy to find a node that's in our metadata
+			while (currentNodeId !== null && currentNodeId !== undefined) {
+				if (nodePartMetadataRef.current.has(currentNodeId)) {
+					partRootNodeId = currentNodeId;
+					break;
+				}
+
+				// Get parent node
+				try {
+					const parentId = model.getNodeParent(currentNodeId);
+					if (parentId === currentNodeId || parentId === null) {
+						// Reached root or invalid parent
+						break;
+					}
+					currentNodeId = parentId;
+				} catch (err) {
+					console.error("Error getting parent node:", err);
+					break;
+				}
+			}
+
+			// If we didn't find a part root in metadata, this might not be a part we added
+			if (!nodePartMetadataRef.current.has(partRootNodeId)) {
+				console.warn("Selected node is not part of a tracked part");
+				alert("Cannot delete this node - it's not a recognized part");
+				return;
+			}
+
+			// Delete the part root node (this will delete the entire subtree)
+			const deleteResult = model.deleteNode(partRootNodeId);
+
+			// If returns Promise, wait for completion
+			if (deleteResult && typeof deleteResult.then === 'function') {
+				await deleteResult;
+			}
+
+			// Remove node metadata
+			nodePartMetadataRef.current.delete(partRootNodeId);
+
+			setSelectedNodeId(null);
+			setHasChanges(true);
+
+			// Refresh JSON viewer after scene updates
 			setTimeout(() => {
 				jsonViewerRef.current?.refresh();
-			}, 100);
+			}, 200);
 		} catch (err) {
 			console.error("Delete failed:", err);
 		}
