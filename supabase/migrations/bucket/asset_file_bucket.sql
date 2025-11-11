@@ -1,4 +1,4 @@
--- Create bucket for CAD files
+-- 第一步：Create bucket for CAD files
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'asset-file',
@@ -14,7 +14,8 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- Create storage policies for asset-file bucket
+-- ⚠️注意：先执行第一步再执行第二步
+-- 第二步：Create storage policies for asset-file bucket
 CREATE POLICY "Allow public read asset-file"
 ON storage.objects FOR SELECT
 TO public

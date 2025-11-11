@@ -1,4 +1,4 @@
--- Create bucket for images
+-- 第一步：Create bucket for images
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'asset-image',
@@ -14,7 +14,8 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- Create storage policies for asset-image bucket
+-- ⚠️注意：先执行第一步再执行第二步
+-- 第二步：Create storage policies for asset-image bucket
 CREATE POLICY "Allow public read asset-image"
 ON storage.objects FOR SELECT
 TO public
