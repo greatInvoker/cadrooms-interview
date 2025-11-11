@@ -1,0 +1,8 @@
+{
+    "parts": [
+        {"id": 1, "name": "axe"},
+        {"id": 2, "name": "bearing_CS"},
+        {"id": 3, "name": "bearing_pr_dw"},
+        {"id": 4, "name": "bearing_pr_up"}
+    ]
+}
