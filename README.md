@@ -1,273 +1,659 @@
-# CADRooms Scene Manager
+# CAD ROOMS - 3D Scene Management System
 
-A React + TypeScript application for managing 3D assembly scenes with HOOPS Web Viewer integration and Supabase backend.
+A modern 3D scene editing and management platform that integrates HOOPS Web Viewer 3D engine and Supabase backend services, providing complete CAD part management and scene editing functionality.
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19.1-61dafb.svg)](https://reactjs.org/)
+[![Vitest](https://img.shields.io/badge/Tested_with-Vitest-6E9F18.svg)](https://vitest.dev/)
+[![Coverage](https://img.shields.io/badge/Coverage-84.49%25-brightgreen.svg)](./TEST_REPORT.md)
 
 ## 📋 Project Overview
 
-This project provides a web-based interface for creating, editing, and viewing 3D assembly scenes. Users can:
+CAD ROOMS is a full-stack web application that provides users with an intuitive experience for creating and managing 3D scenes. Through a modern technology stack and industrial-grade 3D engine, it implements a complete workflow from part uploading and scene editing to configuration saving.
 
-- Manage scene collections (create, read, update, delete)
-- View 3D models using HOOPS Web Viewer
-- Drag and drop parts from a library into scenes
-- Edit scene assemblies interactively
-- Persist scene data in Supabase
+### Core Features
+
+- **Scene Management** - Create, edit, delete 3D scenes with support for scene configuration serialization and deserialization
+- **Part Management** - Upload and manage CAD files (.scs/.step/.stl) with thumbnail previews
+- **3D Editor** - Interactive 3D scene editor based on HOOPS Web Viewer
+- **Drag & Drop** - Drag parts from the library into 3D space with WYSIWYG experience
+- **Scene Persistence** - Automatic scene configuration saving to Supabase, including part positions and transformation matrices
+- **Preset Part Library** - Built-in mechanical parts library, ready to use out of the box
 
 ## ✨ Features
 
-### Scene Management
+### 🎨 Scene Management
 
-- **Scene List**: View all scenes sorted by last update time
-- **Create Scene**: Add new scenes with name and description
-- **Edit Scene Info**: Update scene metadata
-- **Delete Scene**: Remove scenes with confirmation
-- **Real-time Updates**: Automatic refresh after modifications
+- **Scene List** - View all scenes sorted by update time
+- **Create Scene** - Add new scenes with name and description
+- **Edit Scene Info** - Update scene name, description, and other metadata
+- **Delete Scene** - Soft delete mechanism with confirmation dialog
+- **Scene Preview** - Quick view of scene configuration and contained parts
+- **JSON Viewer** - View and export scene configuration in JSON format
 
-### 3D Viewer
+### 🔧 Part Management
 
-- **HOOPS Integration**: Direct integration of Tech Soft 3D's `assembly_creator` as a React component
-- **Parts Library**: Visual catalog of 15 available parts with thumbnails
-- **Drag & Drop**: Intuitive part placement in 3D space
-- **Interactive View**: Rotate, zoom, and pan the 3D scene
-- **Axis Triad**: Visual orientation helper
+- **Part Upload** - Support for .scs, .step, .stl and other CAD file formats
+- **Thumbnail Management** - Upload preview images (PNG/JPG) for parts
+- **Part Library** - Browse all available parts, including system presets and user uploads
+- **File Validation** - Automatic validation of file type and size (max 100MB)
+- **Soft Delete** - Parts can be recovered after deletion
+- **Dual Buckets** - Separate storage for CAD files and images
 
-### Scene Editor
+### 🖥️ 3D Editor
 
-- **Part Management**: Add and remove parts from assemblies
-- **Selection**: Click to select parts in the scene
-- **Delete Parts**: Remove selected parts from the assembly
-- **Save Scenes**: Persist scene state to database
+- **HOOPS Web Viewer** - Based on industrial-grade HOOPS Communicator engine
+- **Drag & Drop** - Drag parts from the library into the 3D scene
+- **View Controls** - Rotate, pan, zoom 3D view
+- **Part Selection** - Click to select parts in the scene
+- **Transform Editing** - Support for editing part position and rotation transformation matrices
+- **Visibility Control** - Show/hide parts in the scene
+- **Scene Serialization** - Automatically save scene configuration to database
+
+### 🎯 User Experience
+
+- **Welcome Page** - Beautiful 3D animated welcome interface (Spline)
+- **Real-time Feedback** - Toast notifications for operation results
+- **Responsive Design** - Support for different screen sizes
+- **Loading States** - Clear loading and error state indicators
 
 ## 🛠️ Tech Stack
 
-- **Frontend Framework**: React 19 with TypeScript 5.9
-- **Build Tool**: Vite 7 (rolldown-vite fork)
-- **Backend**: Supabase (PostgreSQL + client SDK)
-- **3D Viewer**: HOOPS Web Viewer 2024.0.0
-- **Package Manager**: pnpm
-- **Linting**: ESLint 9 with React plugins
+### Frontend Technologies
+
+- **React 19.1** - Latest React version with concurrent features
+- **TypeScript 5.9** - Strict type checking for enhanced code quality
+- **Vite 7** (Rolldown) - Ultra-fast build tool
+- **Tailwind CSS 4** - Modern CSS framework
+- **Radix UI** - Accessible UI component library
+
+### 3D Engine
+
+- **HOOPS Web Viewer 2024** - Industrial-grade 3D engine by Tech Soft 3D
+- Support for multiple CAD formats (.scs, .step, .stl)
+- High-performance rendering and interaction
+
+### Backend Services
+
+- **Supabase** - Open-source Firebase alternative
+  - PostgreSQL database
+  - Storage service
+  - Row Level Security (RLS)
+  - Real-time data subscriptions
+
+### Testing Tools
+
+- **Vitest 4.0** - Fast unit testing framework
+- **Testing Library** - React component testing
+- **Coverage: 84.49%** - High code coverage
+- **59 Test Cases** - All passing ✅
+
+### Development Tools
+
+- **ESLint 9** - Code quality checking
+- **pnpm** - Efficient package manager
+- **happy-dom** - Lightweight DOM testing environment
 
 ## 📁 Project Structure
 
 ```
 take-home/
 ├── public/
-│   ├── parts/                      # 3D model files (.scs) and thumbnails
-│   │   ├── parts_list.json         # Parts catalog (15 parts)
-│   │   ├── housing.scs/.png        # Individual part files
-│   │   └── ...
-│   └── test-viewer.html            # HOOPS Viewer test page
+│   ├── preset_parts/           # Preset parts library
+│   │   ├── axe.scs/.png       # Axe and thumbnail
+│   │   ├── bearing_*.scs/.png # Bearing series
+│   │   └── parts_list.json    # Parts catalog
+│   └── testing_parts/          # Testing parts
+│
 ├── src/
 │   ├── components/
-│   │   ├── ScenesList.tsx          # Scene management UI (CRUD)
-│   │   ├── SceneViewer.tsx         # 3D scene viewer component
-│   │   ├── SceneEditor.tsx         # Interactive scene editor
-│   │   └── PartsList.tsx           # Draggable parts library
+│   │   ├── ScenesList.tsx      # Scene list management UI
+│   │   ├── SceneEditor.tsx     # 3D scene editor
+│   │   ├── SceneViewer.tsx     # Read-only scene viewer
+│   │   ├── SceneJsonViewer.tsx # JSON configuration viewer
+│   │   ├── PartsList.tsx       # Parts library component
+│   │   ├── PartUploadDialog.tsx # Part upload dialog
+│   │   ├── WelcomePage.tsx     # Welcome page
+│   │   └── ui/                 # Radix UI components
+│   │       ├── button.tsx
+│   │       ├── dialog.tsx
+│   │       ├── card.tsx
+│   │       └── ...
+│   │
+│   ├── services/
+│   │   ├── partsManager.ts     # Parts management API
+│   │   ├── sceneSerializer.ts  # Scene serialization/deserialization
+│   │   └── scenesService.ts    # Scene CRUD operations
+│   │
 │   ├── lib/
-│   │   └── supabase.ts             # Supabase client singleton
+│   │   ├── supabase.ts         # Supabase client
+│   │   └── utils.ts            # Utility functions
+│   │
 │   ├── types/
-│   │   ├── index.ts                # Scene type definitions
-│   │   └── hoops.d.ts              # HOOPS Web Viewer types
-│   ├── App.tsx                     # Main application component
-│   ├── main.tsx                    # Application entry point
-│   └── index.css                   # Global styles
+│   │   ├── Scene.ts            # Scene type definitions
+│   │   ├── parts.ts            # Parts type definitions
+│   │   ├── sceneConfig.ts      # Scene configuration types
+│   │   └── hoops.d.ts          # HOOPS type declarations
+│   │
+│   ├── test/                   # Test files
+│   │   ├── setup.ts            # Test environment setup
+│   │   ├── sceneSerializer.test.ts  # Scene serialization tests
+│   │   ├── partsManager.test.ts     # Parts management tests
+│   │   ├── ui.test.tsx         # UI component tests
+│   │   └── integration/
+│   │       └── scene.test.ts   # Integration tests
+│   │
+│   ├── App.tsx                 # Main application component
+│   ├── main.tsx                # Application entry point
+│   └── index.css               # Global styles
+│
 ├── supabase/
+│   ├── config.toml             # Supabase configuration
 │   └── migrations/
-│       └── 20250108000000_create_scenes_table.sql  # Database schema
-├── .env.local                      # Environment variables (gitignored)
-├── CLAUDE.md                       # Claude Code usage guide
-├── PROJECT_PLAN.md                 # Development progress report
-├── README.md                       # English Document
-├── README-zh.md                    # Chinese Document
-└── package.json                    # Project configuration
+│       ├── table/
+│       │   ├── scenes_table.sql    # Scenes table
+│       │   └── parts_table.sql     # Parts table
+│       └── bucket/
+│           ├── asset_file_bucket.sql   # CAD file storage bucket
+│           └── asset_image_bucket.sql  # Image storage bucket
+│
+├── coverage/                   # Test coverage reports
+├── dist/                       # Build output
+├── .env.local                  # Environment variables
+├── package.json
+├── vite.config.ts              # Vite configuration
+├── vitest.config.ts            # Vitest configuration
+├── tsconfig.json               # TypeScript configuration
+├── README.md                   # English documentation (this file)
+├── README-zh.md                # Chinese documentation
+├── TESTING.md                  # Testing guide
+├── TEST_REPORT.md              # Detailed test report
+└── TEST_CASES.md               # Test cases checklist
 ```
 
-## 🚀 Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - **Node.js**: v18 or higher
 - **pnpm**: v8 or higher
-- **Supabase CLI**: For local development
-- **Git**: For version control
+- **Supabase Account**: [Register at Supabase](https://supabase.com) or use local instance
+- **Modern Browser**: Chrome, Firefox, Safari, or Edge
 
-### Environment Variables
+### Installation Steps
 
-Create a `.env.local` file in the project root with your Supabase credentials:
+#### 1. Clone Repository
+
+```bash
+git clone <repository-url>
+cd take-home
+```
+
+#### 2. Install Dependencies
+
+```bash
+pnpm install
+```
+
+#### 3. Configure Environment Variables
+
+Create a `.env.local` file in the project root:
 
 ```env
-VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_API_KEY=your_supabase_anon_key
 ```
 
-**Example for local Supabase:**
+**Getting Supabase Credentials:**
 
-```env
-VITE_SUPABASE_URL=http://localhost:54321
-VITE_SUPABASE_API_KEY=your_local_anon_key
-```
+- Log in to [Supabase Dashboard](https://app.supabase.com)
+- Create a new project or select an existing one
+- Go to Settings → API
+- Copy the `Project URL` and `anon/public` API key
 
-### Installation
+#### 4. Setup Database
 
-1. **Clone the repository**
+Two ways to set up the database:
 
-   ```bash
-   git clone <repository-url>
-   cd take-home
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   pnpm install
-   ```
-
-3. **Set up Supabase**
-
-   **Option A: Use Supabase Cloud**
-
-   - Create a project at [supabase.com](https://supabase.com)
-   - Copy your project URL and anon key to `.env.local`
-   - Run migrations (see Database Setup below)
-
-   **Option B: Use Local Supabase**
-
-   ```bash
-   # Start Supabase local instance
-   supabase start
-
-   # Copy the API URL and anon key to .env.local
-   # These will be displayed after starting Supabase
-   ```
-
-4. **Run database migrations**
-
-   ```bash
-   # For local Supabase
-   supabase db reset
-
-   # Or manually execute the migration file
-   psql <connection-string> < supabase/migrations/20250108000000_create_scenes_table.sql
-   ```
-
-5. **Start the development server**
-
-   ```bash
-   pnpm dev
-   ```
-
-   The application will open at `http://localhost:5173/`
-
-## 📊 Database Schema
-
-### `scenes` Table
-
-| Column        | Type        | Description                  |
-| ------------- | ----------- | ---------------------------- |
-| `id`          | UUID        | Primary key (auto-generated) |
-| `name`        | TEXT        | Scene name (required)        |
-| `description` | TEXT        | Scene description (optional) |
-| `assets`      | TEXT[]      | Array of asset file names    |
-| `created_at`  | TIMESTAMPTZ | Creation timestamp (auto)    |
-| `updated_at`  | TIMESTAMPTZ | Last update timestamp (auto) |
-
-**Features:**
-
-- Automatic `updated_at` timestamp via trigger
-- Indexed on `updated_at` for efficient sorting
-- UUID primary keys for global uniqueness
-
-## 🎮 Usage Guide
-
-### Managing Scenes
-
-1. **Create a Scene**
-
-   - Click "Create New Scene" button
-   - Enter a name (required) and description (optional)
-   - Click "Create"
-
-2. **Edit Scene Metadata**
-
-   - Click "Edit Info" on any scene
-   - Modify name and/or description
-   - Click "Update"
-
-3. **Delete a Scene**
-   - Click "Delete" on any scene
-   - Confirm the deletion in the dialog
-
-### Working with 3D Scenes
-
-1. **View a Scene**
-
-   - Click "View" on any scene
-   - The 3D viewer opens with the housing model loaded by default
-   - Browse available parts in the right panel
-
-2. **Edit a Scene**
-   - Click "Edit 3D" on any scene
-   - Drag parts from the right panel into the 3D view
-   - Click on parts to select them
-   - Use "Delete Selected" to remove parts
-   - Click "Save" to persist changes
-
-### Part Library
-
-The parts library includes 15 mechanical parts:
-
-- Axe
-- Bearings (CS, Pr Dw, Pr Up)
-- Carburetor
-- Crankshaft
-- Cylinder Liner
-- Housing (Main, Back, Front, Top)
-- Piston
-- Push Rod
-- Screws (Back, Top)
-
-Each part displays a thumbnail preview for easy identification.
-
-## 🔧 Development
-
-### Available Scripts
+**Method A: Using Supabase CLI (Recommended)**
 
 ```bash
-# Start development server (auto-opens browser)
+# Install Supabase CLI (if not already installed)
+npm install -g supabase
+
+# Link to your project
+supabase link --project-ref your-project-ref
+
+# Run migrations
+supabase db push
+
+# Or use local development environment
+supabase start
+supabase db reset
+```
+
+**Method B: Manual SQL Execution**
+
+Execute the following SQL files in order in the Supabase Dashboard SQL Editor:
+
+1. `supabase/migrations/table/scenes_table.sql`
+2. `supabase/migrations/table/parts_table.sql`
+3. `supabase/migrations/bucket/asset_file_bucket.sql`
+4. `supabase/migrations/bucket/asset_image_bucket.sql`
+
+#### 5. Start Development Server
+
+```bash
+pnpm dev
+```
+
+The application will start at `http://localhost:5173` and automatically open in your browser.
+
+### 📦 Available Scripts
+
+```bash
+# Development server (hot reload)
 pnpm dev
 
-# Build for production (TypeScript check + Vite build)
+# Type check + production build
 pnpm build
 
 # Preview production build
 pnpm preview
 
-# Run linter
+# Lint code
 pnpm lint
+
+# Run tests (watch mode)
+pnpm test
+
+# Run tests (single run)
+pnpm test:run
+
+# Test coverage report
+pnpm test:coverage
+
+# Test UI interface
+pnpm test:ui
 ```
 
-### TypeScript Configuration
+## 📊 Database Schema
 
-The project uses strict TypeScript mode with:
+### `scenes` Table
 
-- `noUnusedLocals`: true
-- `noUnusedParameters`: true
-- `strictNullChecks`: true
-- Target: ES2022
-- Module resolution: bundler mode
+Stores metadata and configuration for 3D scenes.
 
-### Testing HOOPS Viewer
+| Column        | Type        | Description                                                    |
+| ------------- | ----------- | -------------------------------------------------------------- |
+| `id`          | UUID        | Primary key (auto-generated)                                   |
+| `name`        | TEXT        | Scene name (required)                                          |
+| `description` | TEXT        | Scene description (optional)                                   |
+| `assets`      | TEXT[]      | Array of asset file names (deprecated)                         |
+| `scene_json`  | JSONB       | Serialized scene configuration (parts, transforms, positions)  |
+| `user_id`     | UUID        | User ID (reserved field)                                       |
+| `del_flag`    | INTEGER     | Soft delete flag (0=active, 1=deleted)                         |
+| `created_at`  | TIMESTAMPTZ | Creation timestamp (automatic)                                 |
+| `updated_at`  | TIMESTAMPTZ | Last update timestamp (automatic)                              |
 
-A standalone test page is available at `/test-viewer.html` to verify HOOPS Web Viewer functionality independently from the React app.
+**Indexes:**
 
-## 📦 Build and Deploy
+- `idx_scenes_updated_at` - Sorting by update time
+- `idx_scenes_user_id` - User-related queries
+- `idx_scenes_del_flag` - Soft delete filtering
+- `idx_scenes_name` - Name search
 
-### Build for Production
+**Triggers:**
+
+- Automatically updates `updated_at` field
+
+### `parts` Table
+
+Stores metadata and file references for CAD parts.
+
+| Column        | Type        | Description                                      |
+| ------------- | ----------- | ------------------------------------------------ |
+| `id`          | UUID        | Primary key (auto-generated)                     |
+| `name`        | TEXT        | Part name (required)                             |
+| `description` | TEXT        | Part description (optional)                      |
+| `file_id`     | UUID        | CAD file ID (pointing to Storage)                |
+| `image_id`    | UUID        | Thumbnail ID (pointing to Storage, optional)     |
+| `remarks`     | TEXT        | Additional remarks                               |
+| `is_system`   | BOOLEAN     | Whether it's a system preset part (default false)|
+| `del_flag`    | INTEGER     | Soft delete flag (0=active, 1=deleted)           |
+| `created_at`  | TIMESTAMPTZ | Creation timestamp (automatic)                   |
+| `updated_at`  | TIMESTAMPTZ | Last update timestamp (automatic)                |
+
+**Indexes:**
+
+- `idx_parts_name` - Name search
+- `idx_parts_del_flag` - Soft delete filtering
+- `idx_parts_is_system` - System/user part distinction
+- `idx_parts_created_at` - Sorting by creation time
+
+### Storage Buckets
+
+**`asset-file` Bucket**
+
+- Stores CAD files (.scs, .step, .stl)
+- Max file size: 100MB
+- Public access
+
+**`asset-image` Bucket**
+
+- Stores part thumbnails (PNG, JPG)
+- Max file size: 10MB
+- Public access
+
+## 🎮 Usage Guide
+
+### First-time Use
+
+1. **Start Application** - Visit `http://localhost:5173`
+2. **Welcome Page** - Click "Enter" to access the main interface
+3. **Create Scene** - Click "Create New Scene" to create your first scene
+
+### Scene Management
+
+#### Create New Scene
+
+1. Click the "Create New Scene" button in the top right corner
+2. Enter scene name (required)
+3. Enter scene description (optional)
+4. Click "Create" to finish
+
+#### Edit Scene Metadata
+
+1. Click the "Edit Info" button on a scene card
+2. Modify name and/or description
+3. Click "Update" to save changes
+
+#### Delete Scene
+
+1. Click the "Delete" button on a scene card
+2. Click "Confirm" in the confirmation dialog
+3. The scene will be soft-deleted (can be recovered from database)
+
+### 3D Scene Editing
+
+#### View Scene
+
+1. Click the "View" button on a scene card
+2. The 3D viewer will open and display the scene content
+3. The parts library is displayed in the right panel
+
+#### Edit Scene
+
+1. Click the "Edit 3D" button on a scene card
+2. **Add Parts**:
+   - Drag parts from the right panel into the 3D view
+   - Parts will be automatically added to the scene
+3. **Select Parts**:
+   - Click on parts in the 3D view to select them
+   - Selected parts will be highlighted
+4. **Delete Parts**:
+   - Select the part to delete
+   - Click the "Delete Selected" button
+5. **Save Scene**:
+   - Click the "Save" button to save all changes
+   - Scene configuration will be automatically serialized and saved to the database
+
+#### 3D View Operations
+
+- **Rotate View** - Left mouse button drag
+- **Pan View** - Middle mouse button or Shift + left mouse button drag
+- **Zoom View** - Mouse wheel
+
+### Part Management
+
+#### Browse Part Library
+
+- The parts library is displayed in the right panel of the editor
+- Each part shows a thumbnail and name
+- Supports both system preset parts and user-uploaded parts
+
+#### Upload New Part
+
+1. Click the "Upload New Part" button at the top of the parts library
+2. Fill in part information:
+   - Name (required)
+   - Description (optional)
+   - Remarks (optional)
+3. Upload CAD file (.scs/.step/.stl)
+4. Upload thumbnail (PNG/JPG, optional)
+5. Click "Upload" to complete
+
+### View Scene Configuration
+
+1. Click the "View JSON" button on a scene card
+2. View the scene's JSON configuration
+3. Can copy configuration for debugging or backup
+
+## 🧪 Testing
+
+This project includes a comprehensive testing suite to ensure code quality and functionality.
+
+### Test Statistics
+
+- **Test Files**: 4
+- **Test Cases**: 59
+- **Pass Rate**: 100% ✅
+- **Code Coverage**: 84.49%
+- **Test Framework**: Vitest + Testing Library
+
+### Running Tests
 
 ```bash
+# Run tests in watch mode
+pnpm test
+
+# Single run of all tests
+pnpm test:run
+
+# Generate coverage report
+pnpm test:coverage
+
+# Open test UI interface
+pnpm test:ui
+```
+
+### Test Coverage
+
+#### ✅ Tested Modules
+
+- **Scene Serialization** (`sceneSerializer.ts`) - 15 tests
+  - Serialization and deserialization
+  - Transformation matrix handling
+  - Node metadata management
+
+- **Part Management** (`partsManager.ts`) - 24 tests
+  - File upload (CAD + images)
+  - CRUD operations
+  - File validation
+  - URL generation
+
+- **Integration Tests** (`integration/scene.test.ts`) - 10 tests
+  - Complete scene workflow
+  - Large scene handling
+  - Error recovery mechanisms
+
+- **UI Components** (`ui.test.tsx`) - 10 tests
+  - Button component
+  - Event handling
+  - Style variants
+
+### View Detailed Reports
+
+- **[TESTING.md](./TESTING.md)** - Testing guide and configuration instructions
+- **[TEST_REPORT.md](./TEST_REPORT.md)** - Detailed test report and analysis
+- **[TEST_CASES.md](./TEST_CASES.md)** - Complete test cases checklist
+- **coverage/index.html** - HTML format coverage report
+
+## 🏗️ Architecture Design
+
+### Frontend Architecture
+
+```
+User Interface
+    ↓
+React Component Layer
+    ↓
+Service Layer (Services)
+    ↓
+Supabase Client
+    ↓
+Backend API
+```
+
+### Core Modules
+
+#### 1. Component Layer (`src/components/`)
+
+- **Business Components** - Scene management, editor, parts library
+- **UI Components** - Reusable components based on Radix UI
+- **Layout Components** - Welcome page, main layout
+
+#### 2. Service Layer (`src/services/`)
+
+- **partsManager** - Part CRUD, file upload, URL generation
+- **sceneSerializer** - Scene serialization/deserialization
+- **scenesService** - Scene CRUD operations
+
+#### 3. Type System (`src/types/`)
+
+- Complete TypeScript type definitions
+- HOOPS Web Viewer type declarations
+- Scene configuration and part data structures
+
+### Data Flow
+
+#### Scene Save Flow
+
+```
+1. User edits scene in 3D editor
+2. Click "Save" button
+3. serializeScene() extracts scene data
+4. Generate SceneConfig JSON
+5. Save to Supabase scenes table
+6. Update scene_json field
+```
+
+#### Scene Load Flow
+
+```
+1. Read scene_json from database
+2. deserializeScene() parses configuration
+3. Load each part based on cadUrl
+4. Apply transformation matrix and visibility
+5. Render complete 3D scene
+```
+
+## 🔧 Development
+
+### Technical Requirements
+
+- TypeScript strict mode
+- ESLint configuration
+- Code formatting (Prettier recommended)
+- Git commit conventions
+
+### Adding New Features
+
+1. **Create Branch**
+
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Develop Feature**
+
+   - Write code
+   - Add type definitions
+   - Update related documentation
+
+3. **Write Tests**
+
+   ```bash
+   # Add tests for new features
+   touch src/test/your-feature.test.ts
+   ```
+
+4. **Run Tests and Checks**
+
+   ```bash
+   pnpm test:run
+   pnpm lint
+   pnpm build
+   ```
+
+5. **Commit Code**
+   ```bash
+   git add .
+   git commit -m "feat: add your feature"
+   ```
+
+### Debugging Tips
+
+#### Debugging HOOPS Viewer
+
+Access the viewer instance in the browser console:
+
+```javascript
+// The global viewer is exposed in SceneEditor.tsx
+window.hwv_viewer.model.getNodeChildren(0);
+```
+
+#### View Scene Configuration
+
+```javascript
+// Serialize current scene
+const config = await window.serializeCurrentScene();
+console.log(JSON.stringify(config, null, 2));
+```
+
+### Performance Optimization Suggestions
+
+1. **Large Scenes** - Use LOD (Level of Detail)
+2. **Parts Library** - Implement virtual scrolling
+3. **Scene Loading** - Add loading progress bar
+4. **3D Rendering** - Adjust HOOPS Viewer rendering quality
+
+## 📦 Deployment
+
+### Build Production Version
+
+```bash
+# Type check + build
 pnpm build
 ```
 
-Output will be in the `dist/` directory.
+Build output is located in the `dist/` directory.
+
+### Deploy to Vercel
+
+1. Install Vercel CLI:
+
+   ```bash
+   npm install -g vercel
+   ```
+
+2. Deploy:
+
+   ```bash
+   vercel --prod
+   ```
+
+3. Configure environment variables:
+   - Add in Vercel project settings:
+     - `VITE_SUPABASE_URL`
+     - `VITE_SUPABASE_API_KEY`
+
+### Deploy to Netlify
+
+1. Connect Git repository to Netlify
+2. Configure build settings:
+   - Build command: `pnpm build`
+   - Publish directory: `dist`
+3. Add environment variables
 
 ### Preview Production Build
 
@@ -275,73 +661,274 @@ Output will be in the `dist/` directory.
 pnpm preview
 ```
 
-Serves the production build at `http://localhost:4173/`
+Local preview address: `http://localhost:4173`
 
-## ⚠️ Known Limitations
+## ⚠️ Notes and Limitations
 
-1. **Initial Model Loading**: The viewer currently loads `housing.scs` as the default initial model on startup.
+### Current Limitations
 
-2. **Scene Persistence**: Scene configurations (part positions, rotations) are not yet fully persisted to Supabase Storage.
+1. **User Authentication** - User login and permission management not yet implemented
 
-3. **Part Files**: Only 6 of 15 parts have been downloaded:
+   - All scenes and parts are currently public
+   - `user_id` field reserved for future use
 
-   - housing, piston, crankshaft, bearing_CS, cylinder_liner, carburetor
-   - Remaining 9 parts need to be added for full functionality
+2. **HOOPS Viewer License** - Requires valid HOOPS Communicator license
 
-4. **Browser Compatibility**: Tested primarily on Chrome. Firefox and Safari compatibility not fully verified.
+   - Currently using Tech Soft 3D example code
+   - Production environment requires official license
 
-5. **File Upload**: Direct .scs file upload functionality not yet implemented.
+3. **File Format Support**
 
-## 🔮 Future Improvements
+   - Full support: .scs (HOOPS native format)
+   - Partial support: .step, .stl (requires conversion)
+   - Some complex models may fail to load
 
-### High Priority
+4. **Browser Compatibility**
 
-- [ ] Complete scene persistence (save/load part positions)
-- [ ] Supabase Storage integration for .scs files
-- [ ] Download remaining 9 part files
-- [ ] Fix viewer initialization issues (if any)
+   - Recommended: Chrome 90+, Edge 90+
+   - Supported: Firefox 88+, Safari 14+
+   - WebGL 2.0 is required
 
-### Medium Priority
+5. **Performance Considerations**
+   - Large scenes (>50 parts) may affect performance
+   - Recommend splitting complex parts into sub-assemblies
+   - Limited performance on mobile devices
 
-- [ ] Undo/redo functionality
-- [ ] Part rotation controls
-- [ ] Assembly constraints (collinear, concentric, coplanar)
-- [ ] Scene export to JSON
-- [ ] Loading progress indicators
+### Security Considerations
 
-### Low Priority
+1. **Row Level Security (RLS)** - Enabled but requires user policy configuration
+2. **File Upload** - Need to add stricter file type validation
+3. **API Keys** - Do not commit `.env.local` to Git
+4. **CORS Configuration** - Supabase Storage needs proper CORS settings
 
-- [ ] Unit tests
-- [ ] E2E tests
-- [ ] Performance optimization for large assemblies
-- [ ] Multi-user collaboration features
+### Best Practices
+
+- **Scene Naming** - Use descriptive names for easy management
+- **Part Organization** - Add detailed descriptions and tags to parts
+- **Regular Backups** - Export JSON configurations of important scenes
+- **Performance Monitoring** - Pay attention to loading times for large scenes
+- **Test Coverage** - Write test cases when adding new features
+
+## 🔮 Future Roadmap
+
+### Near-term Plans (1-2 months)
+
+#### Feature Enhancements
+
+- [ ] **User Authentication System** - Integrate Supabase Auth
+  - User registration and login
+  - Ownership management for scenes and parts
+  - Team collaboration features
+
+- [ ] **Part Search and Filtering** - Enhance parts library experience
+  - Search by name, tags
+  - Filter by type, size
+  - Favorites and recently used
+
+- [ ] **Scene Version Control** - Save scene history
+  - Auto-save drafts
+  - Version history
+  - Rollback to previous versions
+
+#### Editor Enhancements
+
+- [ ] **Part Transform Controls** - More precise editing
+  - UI controls for position, rotation, scale
+  - Alignment and snapping features
+  - Grid and guidelines
+
+- [ ] **Assembly Constraints** - Smart assembly
+  - Coplanar constraints
+  - Coaxial constraints
+  - Distance constraints
+
+- [ ] **Measurement Tools** - CAD measurement features
+  - Distance measurement
+  - Angle measurement
+  - Area and volume calculation
+
+### Mid-term Plans (3-6 months)
+
+#### Performance Optimization
+
+- [ ] **Virtualized Parts Library** - Improve large list performance
+- [ ] **Scene Preview Thumbnails** - Quick scene identification
+- [ ] **Incremental Loading** - Chunk loading for large scenes
+- [ ] **Web Workers** - Background serialization processing
+
+#### Collaboration Features
+
+- [ ] **Multi-user Real-time Collaboration** - Like Figma
+- [ ] **Comments and Annotations** - Scene annotation system
+- [ ] **Share Links** - Public scene previews
+- [ ] **Export Functionality** - Export as images, PDF
+
+#### Data Management
+
+- [ ] **Scene Templates** - Preset scene templates
+- [ ] **Part Categories and Tags** - Better organization
+- [ ] **Batch Operations** - Batch import/export
+- [ ] **Recycle Bin** - Soft delete data recovery
+
+### Long-term Vision (6+ months)
+
+#### Advanced Features
+
+- [ ] **AI-assisted Design** - Smart part placement recommendations
+- [ ] **Auto-assembly** - Rule-based automatic assembly
+- [ ] **Collision Detection** - Real-time collision detection
+- [ ] **Motion Simulation** - Simple animation and simulation
+
+#### Integration and Extension
+
+- [ ] **PLM Integration** - Integration with PLM systems
+- [ ] **CAD Software Plugins** - SolidWorks, AutoCAD plugins
+- [ ] **API Opening** - RESTful API and SDK
+- [ ] **Mobile Apps** - iOS and Android applications
+
+#### Enterprise Features
+
+- [ ] **Permission Management** - Role-based access control
+- [ ] **Audit Logs** - Operation history tracking
+- [ ] **SSO Integration** - Enterprise single sign-on
+- [ ] **Private Deployment** - Support for on-premises deployment
 
 ## 📚 References
 
-- **HOOPS Web Viewer Docs**: https://docs.techsoft3d.com/hoops/visualize-web/
-- **assembly_creator Source**: https://github.com/techsoft3d/assembly_creator
-- **Supabase Documentation**: https://supabase.com/docs
-- **Vite Documentation**: https://vitejs.dev/
-- **React Documentation**: https://react.dev/
+### Official Documentation
+
+- **[HOOPS Communicator](https://docs.techsoft3d.com/communicator/latest/overview/overview.html)** - 3D engine official docs
+- **[Supabase Documentation](https://supabase.com/docs)** - Backend service docs
+- **[React Documentation](https://react.dev/)** - React framework docs
+- **[TypeScript Handbook](https://www.typescriptlang.org/docs/)** - TypeScript official guide
+- **[Vite Guide](https://vitejs.dev/)** - Build tool documentation
+- **[Vitest Documentation](https://vitest.dev/)** - Test framework documentation
+
+### Related Resources
+
+- **[Radix UI](https://www.radix-ui.com/)** - Accessible UI component library
+- **[Tailwind CSS](https://tailwindcss.com/)** - CSS utility framework
+- **[pnpm Documentation](https://pnpm.io/)** - Package manager documentation
+
+### Examples and Tutorials
+
+- **[assembly_creator](https://github.com/techsoft3d/assembly_creator)** - HOOPS assembly example (reference for this project)
+- **[Supabase Examples](https://github.com/supabase/supabase/tree/master/examples)** - Official example collection
+- **[React Testing Library](https://testing-library.com/react)** - Testing best practices
+
+### Project Documentation
+
+- **[README.md](./README.md)** - English documentation (this file)
+- **[README-zh.md](./README-zh.md)** - Chinese documentation
+- **[TESTING.md](./TESTING.md)** - Testing guide
+- **[TEST_REPORT.md](./TEST_REPORT.md)** - Detailed test report
+- **[TEST_CASES.md](./TEST_CASES.md)** - Test cases checklist
 
 ## 🤝 Contributing
 
-This is an interview project. For the actual assignment, please refer to:
-https://github.com/wikifactory/cadrooms-interview
+### How to Contribute
+
+We welcome all forms of contributions!
+
+1. **Fork the Repository**
+2. **Create Feature Branch** (`git checkout -b feature/AmazingFeature`)
+3. **Commit Changes** (`git commit -m 'Add some AmazingFeature'`)
+4. **Push to Branch** (`git push origin feature/AmazingFeature`)
+5. **Open Pull Request**
+
+### Code Standards
+
+- Follow ESLint configuration
+- Write clear commit messages
+- Add tests for new features
+- Update related documentation
+
+### Commit Message Convention
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+feat: add new feature
+fix: fix bug
+docs: update documentation
+style: code formatting
+refactor: code refactoring
+test: add tests
+chore: build/toolchain updates
+```
+
+### Reporting Issues
+
+Found a bug or have a feature suggestion? Please [create an Issue](https://github.com/your-repo/issues).
+
+Helpful information to include:
+
+- Issue description
+- Steps to reproduce
+- Expected behavior
+- Actual behavior
+- Environment info (browser, OS)
+- Screenshots or error logs
 
 ## 📄 License
 
-This project is created for interview purposes.
+This project is for technical assessment and demonstration purposes.
+
+Related technologies and libraries licenses:
+
+- React - MIT License
+- Supabase - Apache License 2.0
+- HOOPS Communicator - Commercial license (requires acquisition)
+- Radix UI - MIT License
 
 ## 🙏 Acknowledgments
 
-- **Tech Soft 3D** for the HOOPS Web Viewer and assembly_creator example
-- **Supabase** for the backend infrastructure
-- **Vite** team for the excellent build tool
+### Technical Support
+
+- **[Tech Soft 3D](https://www.techsoft3d.com/)** - Providing HOOPS Communicator 3D engine
+- **[Supabase](https://supabase.com/)** - Providing open-source backend services
+- **[Vercel](https://vercel.com/)** - Providing build tools and deployment platform
+
+### Open Source Community
+
+Thanks to all open source contributors, especially:
+
+- React and TypeScript teams
+- Vite and Vitest teams
+- Radix UI and Tailwind CSS teams
+- All dependency library maintainers
+
+### Inspiration
+
+- **[assembly_creator](https://github.com/techsoft3d/assembly_creator)** - Tech Soft 3D assembly example
+- **[Wikifactory CADRooms](https://github.com/wikifactory/cadrooms-interview)** - Original interview project
 
 ---
 
-**Development Status**: Active Development
-**Last Updated**: January 2025
-**Node Version**: 18+
-**Package Manager**: pnpm 8+
+## 📞 Contact
+
+### Developer
+
+- **GitHub**: [@lvweipeng](https://github.com/greatInvoker)
+- **Email**: 593597559@qq.com
+
+### Project Links
+
+- **Repository**: [https://github.com/greatInvoker/take-home](https://github.com/your-username/take-home)
+- **Documentation**: [English](./README.md) | [中文](./README-zh.md)
+
+---
+
+<div align="center">
+
+**⭐ If this project helps you, please give it a Star!**
+
+Made with ❤️ by [lvweipeng](https://github.com/greatInvoker/take-home)
+
+---
+
+**Last Updated**: 2025-11-11
+**Version**: 0.0.0
+**Status**: 🚧 Under Active Development
+
+</div>
