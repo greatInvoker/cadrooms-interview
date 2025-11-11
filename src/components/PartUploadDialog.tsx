@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef } from "react";
-import { uploadCompletePart } from "@/lib/partsManager";
+import { uploadCompletePart } from "@/services/partsManager";
 import type { PartWithUrls } from "@/types/parts";
 import {
 	Dialog,

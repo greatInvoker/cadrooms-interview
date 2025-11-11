@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { listParts, getPartWithUrls, deletePart } from "@/lib/partsManager";
+import { listParts, getPartWithUrls, deletePart } from "@/services/partsManager";
 import type { PartWithUrls } from "@/types/parts";
 import { PartUploadDialog } from "./PartUploadDialog";
 import { Button } from "@/components/ui/button";

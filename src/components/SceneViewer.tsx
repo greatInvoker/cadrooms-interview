@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import type { Scene } from "../types/Scene";
 import { PartsList } from "./PartsList";
 import "../types/hoops.d.ts";
-import { deserializeScene, type SceneConfig } from "@/lib/sceneSerializer";
+import { deserializeScene, type SceneConfig } from "@/services/sceneSerializer";
 
 interface SceneViewerProps {
 	sceneId: string;

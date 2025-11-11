@@ -30,7 +30,7 @@ import "../types/hoops.d.ts";
 import {
 	serializeScene,
 	deserializeScene,
-} from "@/lib/sceneSerializer";
+} from "@/services/sceneSerializer";
 import type { SceneConfig } from "@/types/sceneConfig";
 
 interface SceneEditorProps {

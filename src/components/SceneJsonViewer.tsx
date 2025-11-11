@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy, FileDown, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
-import type { SceneConfig, PartConfig } from "@/lib/sceneSerializer";
+import type { SceneConfig, PartConfig } from "@/services/sceneSerializer";
 
 interface SceneJsonViewerProps {
 	viewer: Communicator.WebViewer | null;
