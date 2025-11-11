@@ -5,6 +5,31 @@ import { Copy, FileDown, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import type { SceneConfig, PartConfig } from "@/services/sceneSerializer";
 
+// Type for compressed JSON part format (used in serialized JSON)
+interface CompressedPartData {
+	name: string;
+	visibility: boolean;
+	matrix: number[];
+	cadUrl?: string;
+	isPreset?: boolean;
+}
+
+// Type for compressed JSON structure (the format saved to JSON)
+interface CompressedSceneData {
+	parts: CompressedPartData[];
+}
+
+// Type for building part data before serialization
+interface BuildingPartData {
+	fileName: string;
+	nodeId: number;
+	matrix: number[];
+	name: string;
+	visible: boolean;
+	cadUrl?: string;
+	isPreset?: boolean;
+}
+
 interface SceneJsonViewerProps {
 	viewer: Communicator.WebViewer | null;
 	onLoadJson?: (config: SceneConfig) => void;
@@ -87,15 +112,7 @@ export const SceneJsonViewer = forwardRef<
 				"bearing_pr_up",
 			]);
 
-			const parts: Array<{
-				fileName: string;
-				nodeId: number;
-				matrix: number[];
-				name: string;
-				visible: boolean;
-				cadUrl?: string;
-				isPreset?: boolean;
-			}> = [];
+			const parts: BuildingPartData[] = [];
 
 			// Use nodeMetadata as the source of truth for which nodes are parts
 			// This way we only serialize nodes that were actually added as parts
@@ -110,7 +127,7 @@ export const SceneJsonViewer = forwardRef<
 						const fileName = nodeName || `part_${nodeId}.scs`;
 						const partBaseName = fileName.replace(/\.scs$/i, "");
 
-						const partData: any = {
+						const partData: BuildingPartData = {
 							fileName,
 							nodeId,
 							matrix: matrix.m,
@@ -135,6 +152,7 @@ export const SceneJsonViewer = forwardRef<
 					} catch (err) {
 						// Node was deleted or doesn't exist anymore - skip it
 						// Silent skip - no need to log for normal delete operations
+						console.warn(err);
 					}
 				});
 			}
@@ -172,7 +190,7 @@ export const SceneJsonViewer = forwardRef<
 				const matrix = part.matrix;
 
 				// Build part JSON with optional fields
-				const partJson: any = {
+				const partJson: CompressedPartData = {
 					name,
 					visibility,
 					matrix,
@@ -219,7 +237,7 @@ export const SceneJsonViewer = forwardRef<
 		}
 
 		try {
-			const compressedData = JSON.parse(jsonText);
+			const compressedData: CompressedSceneData = JSON.parse(jsonText);
 
 			// Validate the structure
 			if (!compressedData.parts || !Array.isArray(compressedData.parts)) {
@@ -229,24 +247,28 @@ export const SceneJsonViewer = forwardRef<
 			// Convert compressed format to full SceneConfig format
 			const config: SceneConfig = {
 				version: "1.0",
-				parts: compressedData.parts.map((part: any, index: number) => {
-					// HOOPS may use spaces in node names, but files use underscores
-					// Normalize to use underscores for file matching
-					const normalizedName = part.name.replace(/\s+/g, "_");
-					const fileName = normalizedName.endsWith(".scs") ? normalizedName : `${normalizedName}.scs`;
+				parts: compressedData.parts.map(
+					(part: CompressedPartData, index: number) => {
+						// HOOPS may use spaces in node names, but files use underscores
+						// Normalize to use underscores for file matching
+						const normalizedName = part.name.replace(/\s+/g, "_");
+						const fileName = normalizedName.endsWith(".scs")
+							? normalizedName
+							: `${normalizedName}.scs`;
 
-					return {
-						fileName,
-						nodeId: 1000 + index, // Generate temporary nodeId
-						matrix: part.matrix,
-						name: part.name,
-						visible: part.visibility !== undefined ? part.visibility : true,
-						// Include cadUrl if present (for user uploaded parts)
-						cadUrl: part.cadUrl,
-						// Include isPreset flag if present
-						isPreset: part.isPreset,
-					};
-				}),
+						return {
+							fileName,
+							nodeId: 1000 + index, // Generate temporary nodeId
+							matrix: part.matrix,
+							name: part.name,
+							visible: part.visibility !== undefined ? part.visibility : true,
+							// Include cadUrl if present (for user uploaded parts)
+							cadUrl: part.cadUrl,
+							// Include isPreset flag if present
+							isPreset: part.isPreset,
+						};
+					}
+				),
 				metadata: {
 					sceneId: "loaded",
 					savedAt: new Date().toISOString(),
@@ -259,14 +281,15 @@ export const SceneJsonViewer = forwardRef<
 				toast.success(`Loaded ${config.parts.length} parts from JSON`);
 			}
 		} catch (err) {
-			console.error("Failed to load JSON:", err);
-
 			// Provide user-friendly error messages
 			if (err instanceof SyntaxError) {
+				console.warn("JSON parsing error:", err.message);
 				toast.error("Invalid JSON format. Please check your JSON syntax.");
 			} else if (err instanceof Error) {
+				console.warn("Failed to load JSON:", err.message);
 				toast.error(err.message);
 			} else {
+				console.warn("Failed to load JSON:", err);
 				toast.error("Failed to load JSON");
 			}
 		}

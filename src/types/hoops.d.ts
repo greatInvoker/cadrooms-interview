@@ -51,9 +51,10 @@ declare global {
       getNodeMatrix(nodeId: NodeId): Matrix;
       setNodeMatrix(nodeId: NodeId, matrix: Matrix): void;
       getNodeChildren(nodeId: NodeId): NodeId[];
+      getNodeParent(nodeId: NodeId): NodeId | null;
       getNodeVisibility(nodeId: NodeId): boolean;
       getRootNode(): NodeId;
-      deleteNode(nodeId: NodeId): void;
+      deleteNode(nodeId: NodeId): void | Promise<void>;
       loadSubtreeFromScsFile(
         parentNodeId: NodeId,
         scsFile: string

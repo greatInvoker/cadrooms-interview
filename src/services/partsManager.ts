@@ -3,7 +3,7 @@
  * Handles all operations related to CAD parts management
  */
 
-import { supabase } from "./supabase";
+import { supabase } from "@/lib/supabase";
 import type {
 	Part,
 	PartCreateData,

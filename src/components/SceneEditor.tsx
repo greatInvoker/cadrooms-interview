@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "../lib/supabase";
-import type { Scene } from "../types/Scene";
+import { supabase } from "@/lib/supabase";
+import type { Scene } from "@/types/Scene";
+import type { PartWithUrls } from "@/types/parts";
 import { PartsList } from "./PartsList";
 import { SceneJsonViewer, type SceneJsonViewerHandle } from "./SceneJsonViewer";
 import { Button } from "@/components/ui/button";
@@ -26,11 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Save, X, Trash2 } from "lucide-react";
-import "../types/hoops.d.ts";
-import {
-	serializeScene,
-	deserializeScene,
-} from "@/services/sceneSerializer";
+import "@/types/hoops.d.ts";
+import { serializeScene, deserializeScene } from "@/services/sceneSerializer";
 import type { SceneConfig } from "@/types/sceneConfig";
 
 interface SceneEditorProps {
@@ -99,7 +97,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 						id: "new",
 						name: "Untitled Scene",
 						description: "",
-							scene_json: null,
+						scene_json: null,
 						del_flag: 0,
 						created_at: new Date().toISOString(),
 						updated_at: new Date().toISOString(),
@@ -353,10 +351,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			console.log(`Loading part from: ${cadUrl}`);
 
 			// Load the part file using the URL
-			const nodeIds = await model.loadSubtreeFromScsFile(
-				rootNodeId,
-				cadUrl
-			);
+			const nodeIds = await model.loadSubtreeFromScsFile(rootNodeId, cadUrl);
 
 			if (!nodeIds || nodeIds.length === 0) {
 				console.error("Failed to load part - no nodes returned");
@@ -459,7 +454,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			const deleteResult = model.deleteNode(partRootNodeId);
 
 			// If returns Promise, wait for completion
-			if (deleteResult && typeof deleteResult.then === 'function') {
+			if (deleteResult !== undefined && deleteResult instanceof Promise) {
 				await deleteResult;
 			}
 
@@ -509,7 +504,11 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			try {
 				if (viewerRef.current) {
 					// 序列化场景状态
-					const config = await serializeScene(viewerRef.current, sceneId, nodePartMetadataRef.current);
+					const config = await serializeScene(
+						viewerRef.current,
+						sceneId,
+						nodePartMetadataRef.current
+					);
 
 					// 保存到数据库scene_json字段
 					const { error } = await supabase
@@ -550,7 +549,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 					.insert({
 						name: formData.name,
 						description: formData.description,
-						})
+					})
 					.select()
 					.single();
 
@@ -561,14 +560,18 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 
 				// 获取场景中的零件列表
 				if (viewerRef.current) {
-					const config = await serializeScene(viewerRef.current, newSceneId, nodePartMetadataRef.current);
+					const config = await serializeScene(
+						viewerRef.current,
+						newSceneId,
+						nodePartMetadataRef.current
+					);
 
 					// 更新scene_json字段
-						await supabase
+					await supabase
 						.from("scenes")
 						.update({
 							scene_json: config,
-							})
+						})
 						.eq("id", newSceneId);
 				}
 
@@ -586,16 +589,20 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			} else {
 				// 更新已有场景
 				if (viewerRef.current) {
-					const config = await serializeScene(viewerRef.current, sceneId, nodePartMetadataRef.current);
+					const config = await serializeScene(
+						viewerRef.current,
+						sceneId,
+						nodePartMetadataRef.current
+					);
 
 					// 更新数据库
-						const { error } = await supabase
+					const { error } = await supabase
 						.from("scenes")
 						.update({
 							name: formData.name,
 							description: formData.description,
 							scene_json: config,
-								updated_at: new Date().toISOString(),
+							updated_at: new Date().toISOString(),
 						})
 						.eq("id", sceneId);
 
@@ -660,7 +667,11 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			setStatus("Saving scene...");
 
 			// 序列化场景状态
-			const config = await serializeScene(viewerRef.current, sceneId, nodePartMetadataRef.current);
+			const config = await serializeScene(
+				viewerRef.current,
+				sceneId,
+				nodePartMetadataRef.current
+			);
 
 			// 获取零件文件列表
 
@@ -725,7 +736,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 	}
 
 	// Handle JSON viewer collapse/expand - resize 3D viewer
-	function handleJsonViewerCollapse(_collapsed: boolean) {
+	function handleJsonViewerCollapse() {
 		// Give time for the DOM to update, then resize viewer
 		setTimeout(() => {
 			if (viewerRef.current) {
@@ -739,7 +750,7 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 	}
 
 	// Handle parts loaded from PartsList component
-	const handlePartsLoaded = (allParts: any[]) => {
+	const handlePartsLoaded = (allParts: PartWithUrls[]) => {
 		setTotalPartsCount(allParts.length);
 	};
 
@@ -813,7 +824,8 @@ export function SceneEditor({ sceneId, onClose, onSave }: SceneEditorProps) {
 			{/* Footer */}
 			<div className="px-6 py-3 border-t bg-muted/30 flex items-center justify-between">
 				<span className="text-xs text-muted-foreground">
-					{totalPartsCount > 0 ? totalPartsCount : parts.length} parts available | Drag parts to add • Select and click delete to remove
+					{totalPartsCount > 0 ? totalPartsCount : parts.length} parts available
+					| Drag parts to add • Select and click delete to remove
 				</span>
 				<div className="flex items-center gap-3">
 					{selectedNodeId && (
